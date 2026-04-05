@@ -35,14 +35,41 @@
         #signout_button:hover {
             background-color: #c5221f;
         }
-        #output { 
-            white-space: pre-wrap; 
-            background: #f4f4f4; 
-            padding: 15px; 
-            border-radius: 5px; 
+        #output {
+            white-space: pre-wrap;
+            background: #f4f4f4;
+            padding: 15px;
+            border-radius: 5px;
             overflow-x: auto;
             border: 1px solid #ddd;
             margin-top: 15px;
+        }
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 10px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+        }
+        .file-thumbnail {
+            width: 48px;
+            height: 48px;
+            margin-right: 15px;
+            object-fit: contain;
+        }
+        .file-info {
+            flex-grow: 1;
+        }
+        .file-name {
+            font-weight: 500;
+            color: #202124;
+            margin-bottom: 4px;
+        }
+        .file-type {
+            font-size: 12px;
+            color: #5f6368;
         }
     </style>
 </head>
@@ -152,7 +179,7 @@
                 // We are fetching just 10 files for now to prove the connection works
                 const response = await gapi.client.drive.files.list({
                     'pageSize': 10,
-                    'fields': 'files(id, name, mimeType, parents)',
+                    'fields': 'files(id, name, mimeType, parents, thumbnailLink, iconLink, webContentLink)',
                 });
                 
                 const files = response.result.files;
@@ -160,9 +187,29 @@
                     document.getElementById('output').innerText = 'No files found.';
                     return;
                 }
-                
-                // Print the raw JSON data to the screen so you can see it
-                document.getElementById('output').innerText = JSON.stringify(files, null, 2);
+
+                // Display files with thumbnails
+                let outputHTML = '';
+                files.forEach(file => {
+                    const thumbnail = file.thumbnailLink || file.iconLink || '';
+                    const fileName = file.name || 'Unnamed';
+                    const mimeType = file.mimeType || 'Unknown type';
+
+                    outputHTML += `
+                        <div class="file-item">
+                            <img src="${thumbnail}"
+                                 alt="${fileName}"
+                                 class="file-thumbnail"
+                                 onerror="this.style.display='none'">
+                            <div class="file-info">
+                                <div class="file-name">${fileName}</div>
+                                <div class="file-type">${mimeType}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                document.getElementById('output').innerHTML = outputHTML;
                 
             } catch (err) {
                 document.getElementById('output').innerText = "Error: " + err.message;
