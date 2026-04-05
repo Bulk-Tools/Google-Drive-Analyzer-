@@ -1,26 +1,60 @@
-# Google Drive Analyzer
+# Google Drive Analyzer - Enterprise Storage Dashboard
 
-A web-based tool to analyze and visualize your Google Drive structure in an interactive tree format.
+A modern, enterprise-grade storage analytics dashboard for Google Drive built with React, Vite, Tailwind CSS, and shadcn/ui. Visualize your Drive data with interactive charts, treemaps, and powerful insights.
 
-## Features
+![Dashboard Preview](https://img.shields.io/badge/Status-In%20Development-yellow)
+![React](https://img.shields.io/badge/React-18.2-blue)
+![Vite](https://img.shields.io/badge/Vite-5.1-purple)
+![Tailwind](https://img.shields.io/badge/Tailwind-3.4-cyan)
 
-- 📁 Interactive tree visualization of your Google Drive
-- 🔍 View file sizes, thumbnails, and metadata
-- 🌳 Expandable/collapsible folder structure
-- 🔐 Secure OAuth 2.0 authentication
-- 📊 Paginated fetching of all Drive files
+## ✨ Features
 
-## Setup Instructions
+### 📊 Visual Analytics
+- **Storage Overview Dashboard** - At-a-glance view of total, used, and free space with elegant progress bars
+- **File Type Breakdown** - Interactive donut charts (coming soon)
+- **Treemap Visualization** - DaisyDisk-style visual representation (coming soon)
+
+### 🗂️ Advanced Features (Coming Soon)
+- Virtualized file tree for 50,000+ files
+- Data grid view with sortable columns
+- Real-time search and smart filters
+- Professional PDF/CSV/JSON exports
+- Intelligent insights (storage hogs, clutter detection)
+
+### 🎨 Premium UI/UX
+- Modern design with smooth animations (Framer Motion)
+- Beautiful loading skeletons
+- Fully responsive layout
+
+## 🚀 Quick Start
 
 ### Prerequisites
 
-To use this application, you need to set up OAuth 2.0 credentials in Google Cloud Console.
+- Node.js 18+ and npm
+- Google Cloud Project with Drive API enabled
+- OAuth 2.0 credentials
 
-### Configuring Google Cloud Console
+### Installation
 
-**IMPORTANT:** The `Error 400: redirect_uri_mismatch` occurs when the JavaScript origin is not properly configured in your Google Cloud Console. Follow these steps to fix it:
+1. **Clone and install**
+   ```bash
+   git clone https://github.com/Bulk-Tools/Google-Drive-Analyzer-.git
+   cd Google-Drive-Analyzer-
+   npm install
+   ```
 
-#### 1. Create/Access Your Google Cloud Project
+2. **Configure Google OAuth** (see below)
+
+3. **Start development server**
+   ```bash
+   npm run dev
+   ```
+
+4. **Open browser**: http://localhost:5173
+
+## 🔐 Google Cloud Setup
+
+### Step 1: Create a Google Cloud Project
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project or select an existing one
@@ -29,7 +63,7 @@ To use this application, you need to set up OAuth 2.0 credentials in Google Clou
    - Search for "Google Drive API"
    - Click "Enable"
 
-#### 2. Configure OAuth Consent Screen
+### Step 2: Configure OAuth Consent Screen
 
 1. Go to "APIs & Services" > "OAuth consent screen"
 2. Choose "External" user type (unless you have a Google Workspace)
@@ -44,96 +78,116 @@ To use this application, you need to set up OAuth 2.0 credentials in Google Clou
    - Add your email address and any other users who need access
 6. Save and continue
 
-#### 3. Create OAuth 2.0 Credentials
+### Step 3: Create OAuth 2.0 Credentials
 
 1. Go to "APIs & Services" > "Credentials"
 2. Click "Create Credentials" > "OAuth client ID"
 3. Choose "Web application"
 4. Configure the application:
    - **Name:** "Google Drive Analyzer Web Client"
-   - **Authorized JavaScript origins:** Add the following URL(s):
-     - `https://bulk-tools.github.io` (for GitHub Pages deployment)
-     - `http://localhost:8000` (for local testing, optional)
+   - **Authorized JavaScript origins:**
+     - `https://bulk-tools.github.io` (for GitHub Pages)
+     - `http://localhost:5173` (for local development)
    - **Authorized redirect URIs:** Leave empty (not needed for this implementation)
 5. Click "Create"
 6. Copy the **Client ID** that appears
 
-#### 4. Update the Application
+### Step 4: Update the Application
 
-1. Open `index.html`
-2. Find line 172 where `CLIENT_ID` is defined
-3. Replace the existing Client ID with your new Client ID:
+1. Open `src/lib/constants.js`
+2. Replace the `CLIENT_ID` with your Client ID:
    ```javascript
-   const CLIENT_ID = 'YOUR-CLIENT-ID-HERE.apps.googleusercontent.com';
+   export const GOOGLE_CONFIG = {
+     CLIENT_ID: 'YOUR-CLIENT-ID.apps.googleusercontent.com',
+     // ... rest of config
+   };
    ```
 
-### Why This Error Occurs
+## 🛠️ Development
 
-The `redirect_uri_mismatch` error happens because:
+### Available Scripts
 
-1. **Google's OAuth 2.0 requires registered origins:** When using Google Identity Services (the modern OAuth flow), Google requires that the JavaScript origin (the domain where your app is hosted) must be explicitly registered in the OAuth client configuration.
+```bash
+npm run dev      # Start development server
+npm run build    # Build for production
+npm run preview  # Preview production build
+npm run lint     # Lint code
+```
 
-2. **Security measure:** This prevents unauthorized websites from using your OAuth credentials to access user data.
+### Project Structure
 
-3. **Origin mismatch:** The error message shows:
-   ```
-   origin=https://bulk-tools.github.io
-   ```
-   This means the app is running on GitHub Pages, but this origin wasn't registered in the Google Cloud Console OAuth client settings.
+```
+src/
+├── components/
+│   ├── ui/              # shadcn/ui components
+│   ├── Dashboard.jsx    # Main dashboard
+│   ├── LoginPage.jsx
+│   └── StorageOverview.jsx
+├── contexts/
+│   └── AuthContext.jsx  # OAuth context
+├── lib/
+│   ├── constants.js     # Configuration
+│   ├── googleDriveService.js
+│   └── utils.js
+├── App.jsx
+└── main.jsx
+```
 
-### Solution
+## 🔒 Security & Privacy
 
-The fix is simple: **Add `https://bulk-tools.github.io` to the "Authorized JavaScript origins"** in your OAuth 2.0 client configuration in Google Cloud Console.
+- **Read-only access**: Only `drive.readonly` scope
+- **No data storage**: All processing in-browser
+- **No external servers**: Data never leaves your machine
+- **Open source**: Full transparency
 
-Once you've added the authorized JavaScript origin and updated the Client ID in the code, the authentication will work correctly.
+## 📦 Deployment
 
-## Usage
+### GitHub Pages
 
-1. Open the application in your web browser
-2. Click "Log In to Google Drive"
-3. Grant permissions to view your Drive files (read-only access)
-4. Click "Analyze My Drive" to fetch and visualize your files
-5. Expand/collapse folders by clicking the arrow icons
-6. View file details including thumbnails and sizes
+1. **Enable GitHub Pages**: Settings > Pages > Source: GitHub Actions
+2. **Push to main**: The workflow auto-deploys
+3. **Update OAuth**: Add your GitHub Pages URL to authorized origins
 
-## Local Development
+## 🐛 Troubleshooting
 
-To test locally:
+### "Error 400: redirect_uri_mismatch"
+Add your domain to **Authorized JavaScript origins** in Google Cloud Console.
 
-1. Add `http://localhost:8000` (or your preferred port) to the Authorized JavaScript origins
-2. Start a local web server:
-   ```bash
-   python -m http.server 8000
-   # or
-   npx http-server -p 8000
-   ```
-3. Open `http://localhost:8000` in your browser
-
-## Security Notes
-
-- The application only requests **read-only** access to your Google Drive (`drive.readonly` scope)
-- No data is stored or transmitted to any server - everything runs in your browser
-- Authentication tokens are managed by Google's Identity Services library
-- Always keep your Client ID public-facing only (Client Secret is not used for JavaScript applications)
-
-## Troubleshooting
-
-### Error 400: redirect_uri_mismatch
-
-**Solution:** Follow the setup instructions above to add your domain to Authorized JavaScript origins.
-
-### "This app isn't verified" warning
-
-This is normal for apps in testing mode. You can:
-- Click "Advanced" > "Go to [App Name] (unsafe)" to proceed
-- Or publish your app (requires Google verification for production use)
+### "This app isn't verified"
+Normal for testing mode. Click **Advanced** > **Go to [App Name] (unsafe)**.
 
 ### Files not loading
-
 - Check browser console for errors
-- Ensure you've granted the necessary permissions
-- Verify the Google Drive API is enabled in your project
+- Verify Google Drive API is enabled
+- Confirm OAuth credentials are correct
 
-## License
+## 🗺️ Roadmap
 
-MIT License - feel free to use and modify as needed.
+**Phase 1 - Foundation** ✅
+- [x] React + Vite + Tailwind setup
+- [x] Google OAuth integration
+- [x] Storage Overview dashboard
+- [x] Loading states and animations
+
+**Phase 2 - Visualizations** (In Progress)
+- [ ] File Type Breakdown chart
+- [ ] Treemap visualization
+- [ ] Virtualized file tree
+- [ ] Data grid with sorting
+
+**Phase 3 - Advanced Features**
+- [ ] PDF/CSV/JSON export
+- [ ] Insights panel
+- [ ] Search and filtering
+- [ ] Dark mode
+
+## 🙏 Acknowledgments
+
+- [shadcn/ui](https://ui.shadcn.com/) - UI components
+- [Recharts](https://recharts.org/) - Data visualization
+- [Framer Motion](https://www.framer.com/motion/) - Animations
+- [Tailwind CSS](https://tailwindcss.com/) - Styling
+
+---
+
+**Built with ❤️ by the Bulk-Tools team**
