@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drive Tree Analyzer</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        #auth-section, #data-section { margin-bottom: 20px; }
+        #output { white-space: pre-wrap; background: #f4f4f4; padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+    <h1>Drive Tree Analyzer</h1>
+
+    <div id="auth-section">
+        <p>Step 1: Authorize access to your Google Drive</p>
+        <button id="authorize_button" onclick="handleAuthClick()">Log In to Google Drive</button>
+        <button id="signout_button" onclick="handleSignoutClick()" style="display: none;">Sign Out</button>
+    </div>
+
+    <div id="data-section" style="display: none;">
+        <p>Step 2: Fetch the structural data</p>
+        <button id="fetch_button" onclick="fetchDriveFiles()">Fetch My Files</button>
+        <div id="output"></div>
+    </div>
+
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client"></script>
+    
+    <script>
+        // === YOUR CONFIGURATION ===
+        // Paste the Client ID you got from the Google Cloud Console here
+        const CLIENT_ID = 'YOUR_CLIENT_ID_HERE.apps.googleusercontent.com'; 
+        
+        // We only want read-only access to metadata
+        const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
+        const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
+
+        let tokenClient;
+        let gapiInited = false;
+        let gisInited = false;
+
+        // Initialize the Google API Client
+        function gapiLoaded() {
+            gapi.load('client', initializeGapiClient);
+        }
+
+        async function initializeGapiClient() {
+            await gapi.client.init({
+                discoveryDocs: [DISCOVERY_DOC],
+            });
+            gapiInited = true;
+            maybeEnableButtons();
+        }
+
+        // Initialize Google Identity Services (OAuth)
+        function gisLoaded() {
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: '', // defined later
+            });
+            gisInited = true;
+            maybeEnableButtons();
+        }
+
+        function maybeEnableButtons() {
+            if (gapiInited && gisInited) {
+                document.getElementById('authorize_button').style.display = 'block';
+            }
+        }
+
+        // Handle the Log In click
+        function handleAuthClick() {
+            tokenClient.callback = async (resp) => {
+                if (resp.error !== undefined) {
+                    throw (resp);
+                }
+                // Show the data section once logged in
+                document.getElementById('authorize_button').style.display = 'none';
+                document.getElementById('signout_button').style.display = 'block';
+                document.getElementById('data-section').style.display = 'block';
+            };
+
+            if (gapi.client.getToken() === null) {
+                // Prompt the user to select an account
+                tokenClient.requestAccessToken({prompt: 'consent'});
+            } else {
+                // Skip the prompt if already authorized
+                tokenClient.requestAccessToken({prompt: ''});
+            }
+        }
+
+        // Handle Sign Out
+        function handleSignoutClick() {
+            const token = gapi.client.getToken();
+            if (token !== null) {
+                google.accounts.oauth2.revoke(token.access_token);
+                gapi.client.setToken('');
+                document.getElementById('data-section').style.display = 'none';
+                document.getElementById('authorize_button').style.display = 'block';
+                document.getElementById('signout_button').style.display = 'none';
+                document.getElementById('output').innerText = '';
+            }
+        }
+
+        // Fetch the files!
+        async function fetchDriveFiles() {
+            document.getElementById('output').innerText = 'Fetching files...\n';
+            try {
+                // We are fetching just 10 files for now to prove it works
+                const response = await gapi.client.drive.files.list({
+                    'pageSize': 10,
+                    'fields': 'files(id, name, mimeType, parents)',
+                });
+                
+                const files = response.result.files;
+                if (!files || files.length == 0) {
+                    document.getElementById('output').innerText += 'No files found.';
+                    return;
+                }
+                
+                // Print the raw JSON data to the screen so you can see it
+                document.getElementById('output').innerText += JSON.stringify(files, null, 2);
+                
+            } catch (err) {
+                document.getElementById('output').innerText += "Error: " + err.message;
+            }
+        }
+    </script>
+    
+    <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+    <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+</body>
+</html>
