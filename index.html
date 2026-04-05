@@ -113,6 +113,305 @@
             padding-left: 0;
             margin: 0;
         }
+    </style>
+</head>
+<body>
+
+    <h1>Drive Tree Analyzer</h1>
+
+    <div id="auth-section">
+        <p>Step 1: Authorize access to your Google Drive</p>
+        <button id="authorize_button" onclick="handleAuthClick()" style="display: none;">Log In to Google Drive</button>
+        <button id="signout_button" onclick="handleSignoutClick()" style="display: none;">Sign Out</button>
+    </div>
+
+    <div id="data-section" style="display: none;">
+        <p>Step 2: Analyze your Drive structure</p>
+        <button id="fetch_button" onclick="fetchDriveFiles()">Analyze My Drive</button>
+        <div id="output"></div>
+    </div>
+
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client"></script>
+    
+    <script>
+        // === YOUR NEW CONFIGURATION ===
+        const CLIENT_ID = '1082194279992-76lg6issm569spcojof6n1ei0g60qnij.apps.googleusercontent.com'; 
+        
+        const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
+        const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
+
+        let tokenClient;
+        let gapiInited = false;
+        let gisInited = false;
+
+        function gapiLoaded() {
+            gapi.load('client', initializeGapiClient);
+        }
+
+        async function initializeGapiClient() {
+            await gapi.client.init({
+                discoveryDocs: [DISCOVERY_DOC],
+            });
+            gapiInited = true;
+            maybeEnableButtons();
+        }
+
+        function gisLoaded() {
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: '', 
+            });
+            gisInited = true;
+            maybeEnableButtons();
+        }
+
+        function maybeEnableButtons() {
+            if (gapiInited && gisInited) {
+                document.getElementById('authorize_button').style.display = 'block';
+            }
+        }
+
+        function handleAuthClick() {
+            tokenClient.callback = async (resp) => {
+                if (resp.error !== undefined) {
+                    throw (resp);
+                }
+                document.getElementById('authorize_button').style.display = 'none';
+                document.getElementById('signout_button').style.display = 'block';
+                document.getElementById('data-section').style.display = 'block';
+            };
+
+            if (gapi.client.getToken() === null) {
+                tokenClient.requestAccessToken({prompt: 'consent'});
+            } else {
+                tokenClient.requestAccessToken({prompt: ''});
+            }
+        }
+
+        function handleSignoutClick() {
+            const token = gapi.client.getToken();
+            if (token !== null) {
+                google.accounts.oauth2.revoke(token.access_token);
+                gapi.client.setToken('');
+                document.getElementById('data-section').style.display = 'none';
+                document.getElementById('authorize_button').style.display = 'block';
+                document.getElementById('signout_button').style.display = 'none';
+                document.getElementById('output').innerText = '';
+            }
+        }
+
+        function renderTree(tree, container) {
+            container.innerHTML = '';
+            const ul = document.createElement('ul');
+            ul.className = 'tree-root';
+
+            const rootLi = createTreeNode(tree, 0);
+            ul.appendChild(rootLi);
+
+            container.appendChild(ul);
+        }
+
+        function createTreeNode(node, depth) {
+            const li = document.createElement('li');
+            li.className = 'tree-node';
+            li.style.marginLeft = `${depth * 20}px`;
+
+            const isFolder = node.mimeType === 'application/vnd.google-apps.folder';
+            const hasChildren = node.children && node.children.length > 0;
+
+            const nodeContent = document.createElement('div');
+            nodeContent.className = 'tree-node-content';
+
+            if (isFolder && hasChildren) {
+                const toggleIcon = document.createElement('span');
+                toggleIcon.className = 'toggle-icon';
+                toggleIcon.textContent = '▶';
+                toggleIcon.onclick = () => toggleNode(li, toggleIcon);
+                nodeContent.appendChild(toggleIcon);
+            } else if (isFolder) {
+                const emptyIcon = document.createElement('span');
+                emptyIcon.className = 'toggle-icon empty';
+                emptyIcon.textContent = '○';
+                nodeContent.appendChild(emptyIcon);
+            } else {
+                const fileIcon = document.createElement('span');
+                fileIcon.className = 'toggle-icon file';
+                fileIcon.textContent = '📄';
+                nodeContent.appendChild(fileIcon);
+            }
+
+            const thumbnail = node.thumbnailLink || node.iconLink;
+            if (thumbnail) {
+                const img = document.createElement('img');
+                img.src = thumbnail;
+                img.className = 'tree-thumbnail';
+                img.onerror = () => img.style.display = 'none';
+                nodeContent.appendChild(img);
+            }
+
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'tree-node-name';
+            nameSpan.textContent = node.name;
+            if (isFolder) {
+                nameSpan.classList.add('folder-name');
+            }
+            nodeContent.appendChild(nameSpan);
+
+            if (node.size && !isFolder) {
+                const sizeSpan = document.createElement('span');
+                sizeSpan.className = 'tree-node-size';
+                sizeSpan.textContent = formatFileSize(node.size);
+                nodeContent.appendChild(sizeSpan);
+            }
+
+            li.appendChild(nodeContent);
+
+            if (hasChildren) {
+                const childrenUl = document.createElement('ul');
+                childrenUl.className = 'tree-children';
+                childrenUl.style.display = 'none'; 
+
+                node.children
+                    .sort((a, b) => {
+                        const aIsFolder = a.mimeType === 'application/vnd.google-apps.folder';
+                        const bIsFolder = b.mimeType === 'application/vnd.google-apps.folder';
+                        if (aIsFolder && !bIsFolder) return -1;
+                        if (!aIsFolder && bIsFolder) return 1;
+                        return a.name.localeCompare(b.name);
+                    })
+                    .forEach(child => {
+                        const childNode = createTreeNode(child, depth + 1);
+                        childrenUl.appendChild(childNode);
+                    });
+
+                li.appendChild(childrenUl);
+            }
+
+            return li;
+        }
+
+        function toggleNode(node, icon) {
+            const childrenUl = node.querySelector('.tree-children');
+            if (childrenUl) {
+                if (childrenUl.style.display === 'none') {
+                    childrenUl.style.display = 'block';
+                    icon.textContent = '▼';
+                } else {
+                    childrenUl.style.display = 'none';
+                    icon.textContent = '▶';
+                }
+            }
+        }
+
+        function formatFileSize(bytes) {
+            if (!bytes || bytes === '0') return '';
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        function buildFileTree(files) {
+            const fileMap = {};
+            const tree = {
+                id: 'root',
+                name: 'My Drive',
+                mimeType: 'application/vnd.google-apps.folder',
+                children: []
+            };
+
+            files.forEach(file => {
+                fileMap[file.id] = {
+                    ...file,
+                    children: []
+                };
+            });
+
+            files.forEach(file => {
+                const fileNode = fileMap[file.id];
+
+                if (!file.parents || file.parents.length === 0) {
+                    tree.children.push(fileNode);
+                } else {
+                    const parentId = file.parents[0];
+                    const parent = fileMap[parentId];
+
+                    if (parent) {
+                        parent.children.push(fileNode);
+                    } else {
+                        tree.children.push(fileNode);
+                    }
+                }
+            });
+
+            return tree;
+        }
+
+        async function fetchDriveFiles() {
+            const outputDiv = document.getElementById('output');
+            outputDiv.innerText = 'Fetching files...\n';
+
+            try {
+                let allFiles = [];
+                let pageToken = null;
+                let pageCount = 0;
+
+                do {
+                    pageCount++;
+                    outputDiv.innerText = `Fetching files... (Page ${pageCount}, ${allFiles.length} files so far)`;
+
+                    const response = await gapi.client.drive.files.list({
+                        'pageSize': 1000,
+                        'fields': 'nextPageToken, files(id, name, mimeType, parents, thumbnailLink, iconLink, size, createdTime)',
+                        'pageToken': pageToken || ''
+                    });
+
+                    const files = response.result.files;
+                    if (files && files.length > 0) {
+                        allFiles = allFiles.concat(files);
+                    }
+
+                    pageToken = response.result.nextPageToken;
+                } while (pageToken);
+
+                outputDiv.innerText = `Fetched ${allFiles.length} files. Building tree structure...`;
+
+                if (allFiles.length === 0) {
+                    outputDiv.innerText = 'No files found in your Drive.';
+                    return;
+                }
+
+                const tree = buildFileTree(allFiles);
+                renderTree(tree, outputDiv);
+
+            } catch (err) {
+                outputDiv.innerText = "Error: " + err.message;
+                console.error(err);
+            }
+        }
+    </script>
+    
+    <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+    <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+</body>
+</html>            color: #202124;
+        }
+        .tree-node-name.folder-name {
+            font-weight: 500;
+            color: #1a73e8;
+        }
+        .tree-node-size {
+            font-size: 12px;
+            color: #5f6368;
+            margin-left: 10px;
+            flex-shrink: 0;
+        }
+        .tree-children {
+            list-style: none;
+            padding-left: 0;
+            margin: 0;
+        }
 
         /* Legacy file-item styles (kept for backward compatibility) */
         .file-item {
