@@ -6,6 +6,7 @@
     <title>Advanced Drive Tree Analyzer</title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <style>
         :root {
@@ -13,96 +14,158 @@
             --primary-hover: #1557b0;
             --danger: #d93025;
             --danger-hover: #c5221f;
+            --success: #34a853;
+            --warning: #fbbc04;
             --bg-color: #f8f9fa;
+            --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             --border-color: #dadce0;
             --text-main: #202124;
             --text-muted: #5f6368;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06);
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.06);
+            --shadow-lg: 0 10px 15px rgba(0,0,0,0.1), 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        * {
+            box-sizing: border-box;
         }
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             padding: 20px;
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
-            background-color: var(--bg-color);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: var(--text-main);
+            min-height: 100vh;
         }
 
         .card {
             background: white;
-            padding: 20px;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            padding: 30px;
+            border: none;
+            border-radius: 12px;
+            box-shadow: var(--shadow-lg);
             margin-bottom: 20px;
+            animation: slideUp 0.4s ease-out;
         }
 
-        h1 { color: var(--primary); margin-top: 0; }
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        h1 {
+            color: var(--primary);
+            margin-top: 0;
+            font-size: 32px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
 
         button {
-            padding: 10px 16px;
+            padding: 12px 20px;
             background-color: var(--primary);
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
             font-size: 14px;
             font-weight: 500;
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            transition: background 0.2s;
+            transition: all 0.3s ease;
+            box-shadow: var(--shadow-sm);
         }
-        button:hover { background-color: var(--primary-hover); }
+        button:hover {
+            background-color: var(--primary-hover);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+        button:active {
+            transform: translateY(0);
+        }
         button .material-icons { font-size: 18px; }
-        
-        #signout_button { background-color: var(--danger); }
-        #signout_button:hover { background-color: var(--danger-hover); }
-        
+
+        #signout_button {
+            background-color: var(--danger);
+        }
+        #signout_button:hover {
+            background-color: var(--danger-hover);
+        }
+
         .toolbar {
             display: flex;
             gap: 10px;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
             flex-wrap: wrap;
-            padding-bottom: 15px;
-            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--border-color);
+            align-items: center;
         }
 
         .secondary-btn {
-            background-color: white;
-            color: var(--text-main);
-            border: 1px solid var(--border-color);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
         }
-        .secondary-btn:hover { background-color: #f1f3f4; }
+        .secondary-btn:hover {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+        }
 
         /* Advanced Tree Styles */
         #tree-container {
-            background: white;
-            padding: 20px;
-            border-radius: 5px;
+            background: linear-gradient(to bottom, #ffffff 0%, #f8f9fa 100%);
+            padding: 25px;
+            border-radius: 8px;
             overflow-x: auto;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.06);
         }
 
         ul { list-style: none; padding: 0; margin: 0; }
-        
+
         .tree-children {
-            padding-left: 24px;
-            border-left: 1px dashed #bdc1c6;
-            margin-left: 12px;
+            padding-left: 28px;
+            border-left: 2px dashed #bdc1c6;
+            margin-left: 14px;
+            position: relative;
+        }
+
+        .tree-children::before {
+            content: '';
+            position: absolute;
+            left: -2px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(to bottom, #bdc1c6 0%, transparent 100%);
         }
 
         .tree-node-content {
             display: flex;
             align-items: center;
-            padding: 6px 8px;
-            margin: 2px 0;
-            border-radius: 4px;
-            transition: background 0.2s;
+            padding: 8px 12px;
+            margin: 3px 0;
+            border-radius: 6px;
+            transition: all 0.2s ease;
             position: relative;
+            background: white;
+            border: 1px solid transparent;
         }
 
         .tree-node-content:hover {
-            background-color: #e8f0fe;
+            background: linear-gradient(135deg, #e8f0fe 0%, #d2e3fc 100%);
+            border-color: #4285f4;
+            transform: translateX(4px);
+            box-shadow: var(--shadow-sm);
         }
 
         .toggle-icon {
@@ -110,56 +173,140 @@
             color: var(--text-muted);
             cursor: pointer;
             user-select: none;
-            width: 24px;
+            width: 28px;
             text-align: center;
-            transition: transform 0.2s;
+            transition: all 0.3s ease;
+            border-radius: 50%;
+            padding: 2px;
         }
 
-        .toggle-icon.expanded { transform: rotate(90deg); }
+        .toggle-icon:hover {
+            background-color: rgba(26, 115, 232, 0.1);
+            color: var(--primary);
+        }
+
+        .toggle-icon.expanded {
+            transform: rotate(90deg);
+            color: var(--primary);
+        }
         .toggle-icon.empty { visibility: hidden; }
 
         .type-icon {
-            font-size: 20px;
-            margin-right: 8px;
+            font-size: 22px;
+            margin-right: 10px;
             color: var(--text-muted);
+            transition: transform 0.2s ease;
         }
-        .type-icon.folder { color: #fbbc04; }
+        .tree-node-content:hover .type-icon {
+            transform: scale(1.1);
+        }
+        .type-icon.folder { color: var(--warning); }
         .type-icon.pdf { color: var(--danger); }
-        .type-icon.image { color: #34a853; }
+        .type-icon.image { color: var(--success); }
 
         .tree-node-name {
             flex-grow: 1;
             font-size: 14px;
             color: var(--text-main);
+            font-weight: 500;
         }
-        .folder-name { font-weight: 600; }
+        .folder-name {
+            font-weight: 600;
+            color: #1a237e;
+        }
 
         .tree-node-size {
             font-size: 12px;
             color: var(--text-muted);
             margin-left: 15px;
+            padding: 2px 8px;
+            background: var(--bg-color);
+            border-radius: 12px;
+            font-weight: 500;
         }
 
         /* Hover Actions */
         .node-actions {
             display: none;
             margin-left: 15px;
-            gap: 5px;
+            gap: 6px;
+            animation: fadeIn 0.2s ease;
         }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
         .tree-node-content:hover .node-actions {
             display: flex;
         }
         .action-icon {
-            font-size: 16px;
+            font-size: 18px;
             color: var(--primary);
             cursor: pointer;
-            padding: 4px;
+            padding: 6px;
+            border-radius: 50%;
+            transition: all 0.2s ease;
+            background: white;
+        }
+        .action-icon:hover {
+            background: var(--primary);
+            color: white;
+            transform: scale(1.15);
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* Status and Loader */
+        #status-text {
+            margin-bottom: 15px;
+            font-weight: 500;
+            color: var(--primary);
+            padding: 12px;
+            background: linear-gradient(135deg, #e8f0fe 0%, #d2e3fc 100%);
+            border-radius: 6px;
+            border-left: 4px solid var(--primary);
+        }
+
+        /* Badge styles for file counts */
+        .stats-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        /* Improved scrollbar */
+        #tree-container::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+        #tree-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
             border-radius: 4px;
         }
-        .action-icon:hover { background-color: #d2e3fc; }
+        #tree-container::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 4px;
+        }
+        #tree-container::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+        }
 
-        /* Loader */
-        #status-text { margin-bottom: 10px; font-weight: 500; color: var(--primary); }
+        /* Loading animation */
+        @keyframes spin {
+            100% { transform: rotate(360deg); }
+        }
+
+        .spinning {
+            animation: spin 2s linear infinite;
+        }
     </style>
 </head>
 <body>
@@ -194,7 +341,16 @@
                     <span class="material-icons">picture_as_pdf</span> Export PDF
                 </button>
                 <button onclick="exportToTXT(globalTreeData, 'Complete_Drive_Tree')">
-                    <span class="material-icons">description</span> Export TXT Tree
+                    <span class="material-icons">description</span> Export TXT
+                </button>
+                <button onclick="exportToJSON(globalTreeData, 'Complete_Drive_Tree')">
+                    <span class="material-icons">code</span> Export JSON
+                </button>
+                <button onclick="exportToCSV(globalTreeData, 'Complete_Drive_Tree')">
+                    <span class="material-icons">table_chart</span> Export CSV
+                </button>
+                <button onclick="exportToHTML(globalTreeData, 'Complete_Drive_Tree')">
+                    <span class="material-icons">html</span> Export HTML
                 </button>
             </div>
             <div id="tree-container"></div>
@@ -370,11 +526,11 @@
                 nodeContent.appendChild(sizeSpan);
             }
 
-            // Hover Actions (Download PDF specifically for this folder)
-            if (isFolder && !isRoot) {
+            // Hover Actions (Download options for folders)
+            if (isFolder) {
                 const actions = document.createElement('div');
                 actions.className = 'node-actions';
-                
+
                 const exportPdfBtn = document.createElement('span');
                 exportPdfBtn.className = 'material-icons action-icon';
                 exportPdfBtn.title = 'Download Folder as PDF';
@@ -393,8 +549,28 @@
                     exportToTXT(node, node.name);
                 };
 
+                const exportJsonBtn = document.createElement('span');
+                exportJsonBtn.className = 'material-icons action-icon';
+                exportJsonBtn.title = 'Download Folder as JSON';
+                exportJsonBtn.textContent = 'code';
+                exportJsonBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    exportToJSON(node, node.name);
+                };
+
+                const exportHtmlBtn = document.createElement('span');
+                exportHtmlBtn.className = 'material-icons action-icon';
+                exportHtmlBtn.title = 'Download Folder as HTML';
+                exportHtmlBtn.textContent = 'html';
+                exportHtmlBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    exportToHTML(node, node.name);
+                };
+
                 actions.appendChild(exportPdfBtn);
                 actions.appendChild(exportTxtBtn);
+                actions.appendChild(exportJsonBtn);
+                actions.appendChild(exportHtmlBtn);
                 nodeContent.appendChild(actions);
             }
 
@@ -428,66 +604,119 @@
         // EXPORT FUNCTIONS
         // ==========================================
         
-        // Export Full UI to PDF
+        // Export Full UI to PDF with Enhanced Professional Styling
         function exportToPDF(elementId, filename) {
             // Ensure everything is expanded before taking the screenshot
-            expandAll(); 
-            
+            expandAll();
+
             const element = document.getElementById(elementId);
+
+            // Create a wrapper for better PDF formatting
+            const wrapper = document.createElement('div');
+            wrapper.style.cssText = 'padding: 20px; background: white; font-family: Arial, sans-serif;';
+
+            const header = document.createElement('div');
+            header.style.cssText = 'margin-bottom: 20px; border-bottom: 3px solid #1a73e8; padding-bottom: 15px;';
+            header.innerHTML = `
+                <h1 style="margin: 0; color: #1a73e8; font-size: 28px;">Google Drive Directory Tree</h1>
+                <p style="margin: 5px 0 0 0; color: #5f6368; font-size: 14px;">Generated on ${new Date().toLocaleString()}</p>
+            `;
+            wrapper.appendChild(header);
+
+            // Clone the tree
+            const treeClone = element.cloneNode(true);
+            // Remove action buttons from clone
+            treeClone.querySelectorAll('.node-actions').forEach(el => el.remove());
+            wrapper.appendChild(treeClone);
+
+            // Add to DOM temporarily
+            document.body.appendChild(wrapper);
+
             const opt = {
-                margin:       10,
-                filename:     `${filename.replace(/\s+/g, '_')}.pdf`,
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true },
-                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                margin: [10, 10, 10, 10],
+                filename: `${filename.replace(/\s+/g, '_')}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: '#ffffff'
+                },
+                jsPDF: {
+                    unit: 'mm',
+                    format: 'a4',
+                    orientation: 'portrait',
+                    compress: true
+                },
+                pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
             };
-            
-            // Temporary hide action icons for clean PDF
-            document.querySelectorAll('.node-actions').forEach(el => el.style.display = 'none');
-            
-            html2pdf().set(opt).from(element).save().then(() => {
-                // Restore hover functionality
-                document.querySelectorAll('.node-actions').forEach(el => el.style.display = '');
+
+            html2pdf().set(opt).from(wrapper).save().then(() => {
+                document.body.removeChild(wrapper);
             });
         }
 
-        // Export Specific Sub-Folder UI to PDF
+        // Export Specific Sub-Folder UI to PDF with Professional Styling
         function exportFolderToPDF(liElement, folderName) {
-            // We clone the specific tree branch, put it in a hidden div, expand it, and print it
             const wrapper = document.createElement('div');
-            wrapper.style.padding = '20px';
-            wrapper.style.background = 'white';
-            
-            const header = document.createElement('h2');
-            header.style.color = '#1a73e8';
-            header.textContent = `Directory: ${folderName}`;
+            wrapper.style.cssText = 'padding: 20px; background: white; font-family: Arial, sans-serif;';
+
+            const header = document.createElement('div');
+            header.style.cssText = 'margin-bottom: 20px; border-bottom: 3px solid #1a73e8; padding-bottom: 15px;';
+            header.innerHTML = `
+                <h1 style="margin: 0; color: #1a73e8; font-size: 28px;">Folder: ${folderName}</h1>
+                <p style="margin: 5px 0 0 0; color: #5f6368; font-size: 14px;">Generated on ${new Date().toLocaleString()}</p>
+            `;
             wrapper.appendChild(header);
 
             const clone = liElement.cloneNode(true);
             // Expand all inside clone
             clone.querySelectorAll('.tree-children').forEach(el => el.style.display = 'block');
-            clone.querySelectorAll('.node-actions').forEach(el => el.remove()); // Remove hover buttons
-            
+            clone.querySelectorAll('.toggle-icon').forEach(el => {
+                el.classList.add('expanded');
+                el.textContent = 'arrow_drop_down';
+            });
+            clone.querySelectorAll('.node-actions').forEach(el => el.remove());
+
             const ul = document.createElement('ul');
+            ul.style.cssText = 'list-style: none; padding: 0; margin: 0;';
             ul.appendChild(clone);
             wrapper.appendChild(ul);
 
+            document.body.appendChild(wrapper);
+
             const opt = {
-                margin: 10,
+                margin: [10, 10, 10, 10],
                 filename: `Folder_${folderName.replace(/\s+/g, '_')}.pdf`,
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: '#ffffff'
+                },
+                jsPDF: {
+                    unit: 'mm',
+                    format: 'a4',
+                    orientation: 'portrait',
+                    compress: true
+                },
+                pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
             };
-            html2pdf().set(opt).from(wrapper).save();
+
+            html2pdf().set(opt).from(wrapper).save().then(() => {
+                document.body.removeChild(wrapper);
+            });
         }
 
         // Professional TXT (ASCII Tree) Export - Best for massive drives
         function exportToTXT(node, filename) {
             let textOutput = `${node.name}\n`;
-            
+
             function buildTextTree(n, prefix = '', isLast = true) {
                 if (!n.children || n.children.length === 0) return '';
                 let result = '';
-                
+
                 n.children.sort((a, b) => {
                     const aIsFolder = a.mimeType === 'application/vnd.google-apps.folder';
                     const bIsFolder = b.mimeType === 'application/vnd.google-apps.folder';
@@ -500,7 +729,7 @@
                     const isChildLast = index === n.children.length - 1;
                     const pointer = isChildLast ? '└── ' : '├── ';
                     result += prefix + pointer + child.name + (child.size ? ` (${formatFileSize(child.size)})` : '') + '\n';
-                    
+
                     if (child.children) {
                         const newPrefix = prefix + (isChildLast ? '    ' : '│   ');
                         result += buildTextTree(child, newPrefix, isChildLast);
@@ -510,11 +739,303 @@
             }
 
             textOutput += buildTextTree(node);
-            
+
             const blob = new Blob([textOutput], { type: 'text/plain' });
             const link = document.createElement('a');
             link.href = window.URL.createObjectURL(blob);
             link.download = `${filename.replace(/\s+/g, '_')}.txt`;
+            link.click();
+        }
+
+        // JSON Export - Full tree structure with metadata
+        function exportToJSON(node, filename) {
+            const jsonData = JSON.stringify(node, null, 2);
+            const blob = new Blob([jsonData], { type: 'application/json' });
+            const link = document.createElement('a');
+            link.href = window.URL.createObjectURL(blob);
+            link.download = `${filename.replace(/\s+/g, '_')}.json`;
+            link.click();
+        }
+
+        // CSV Export - Flat list of all files with full path
+        function exportToCSV(node, filename) {
+            let csvContent = 'Path,Name,Type,Size (Bytes),Size (Formatted),MIME Type\n';
+
+            function buildCSV(n, path = '') {
+                const currentPath = path ? `${path}/${n.name}` : n.name;
+                const isFolder = n.mimeType === 'application/vnd.google-apps.folder';
+
+                // Add current node (skip root)
+                if (path !== '') {
+                    const escapedName = `"${n.name.replace(/"/g, '""')}"`;
+                    const escapedPath = `"${currentPath.replace(/"/g, '""')}"`;
+                    const type = isFolder ? 'Folder' : 'File';
+                    const size = n.size || '';
+                    const sizeFormatted = size ? formatFileSize(size) : '';
+                    csvContent += `${escapedPath},${escapedName},${type},${size},${sizeFormatted},"${n.mimeType}"\n`;
+                }
+
+                // Recurse children
+                if (n.children && n.children.length > 0) {
+                    n.children.sort((a, b) => {
+                        const aIsFolder = a.mimeType === 'application/vnd.google-apps.folder';
+                        const bIsFolder = b.mimeType === 'application/vnd.google-apps.folder';
+                        if (aIsFolder && !bIsFolder) return -1;
+                        if (!aIsFolder && bIsFolder) return 1;
+                        return a.name.localeCompare(b.name);
+                    }).forEach(child => buildCSV(child, currentPath));
+                }
+            }
+
+            buildCSV(node);
+
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const link = document.createElement('a');
+            link.href = window.URL.createObjectURL(blob);
+            link.download = `${filename.replace(/\s+/g, '_')}.csv`;
+            link.click();
+        }
+
+        // HTML Export - Standalone interactive tree
+        function exportToHTML(node, filename) {
+            const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${node.name} - Drive Tree</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #1a73e8;
+            --bg-color: #f8f9fa;
+            --border-color: #dadce0;
+            --text-main: #202124;
+            --text-muted: #5f6368;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+        }
+        h1 { color: var(--primary); }
+        ul { list-style: none; padding: 0; margin: 0; }
+        .tree-children {
+            padding-left: 24px;
+            border-left: 1px dashed #bdc1c6;
+            margin-left: 12px;
+        }
+        .tree-node-content {
+            display: flex;
+            align-items: center;
+            padding: 6px 8px;
+            margin: 2px 0;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        .tree-node-content:hover { background-color: #e8f0fe; }
+        .toggle-icon {
+            font-size: 20px;
+            color: var(--text-muted);
+            cursor: pointer;
+            user-select: none;
+            width: 24px;
+            text-align: center;
+            transition: transform 0.2s;
+        }
+        .toggle-icon.expanded { transform: rotate(90deg); }
+        .toggle-icon.empty { visibility: hidden; }
+        .type-icon {
+            font-size: 20px;
+            margin-right: 8px;
+            color: var(--text-muted);
+        }
+        .type-icon.folder { color: #fbbc04; }
+        .type-icon.pdf { color: #d93025; }
+        .type-icon.image { color: #34a853; }
+        .tree-node-name {
+            flex-grow: 1;
+            font-size: 14px;
+            color: var(--text-main);
+        }
+        .folder-name { font-weight: 600; }
+        .tree-node-size {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-left: 15px;
+        }
+        .toolbar {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>${node.name} - Directory Tree</h1>
+    <div class="toolbar">
+        <button onclick="expandAll()">Expand All</button>
+        <button onclick="collapseAll()">Collapse All</button>
+    </div>
+    <div id="tree-container"></div>
+
+    <script>
+        const treeData = ${JSON.stringify(node)};
+
+        function formatFileSize(bytes) {
+            if (!bytes || bytes === '0') return '';
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        function getFileIcon(mimeType) {
+            if (mimeType === 'application/vnd.google-apps.folder') return 'folder';
+            if (mimeType.includes('pdf')) return 'picture_as_pdf';
+            if (mimeType.includes('image')) return 'image';
+            if (mimeType.includes('spreadsheet') || mimeType.includes('excel')) return 'table_chart';
+            if (mimeType.includes('document') || mimeType.includes('word')) return 'description';
+            return 'insert_drive_file';
+        }
+
+        function getIconClass(mimeType) {
+            if (mimeType === 'application/vnd.google-apps.folder') return 'folder';
+            if (mimeType.includes('pdf')) return 'pdf';
+            if (mimeType.includes('image')) return 'image';
+            return 'default';
+        }
+
+        function toggleNode(event, icon) {
+            event.stopPropagation();
+            const li = icon.closest('li');
+            const childrenUl = li.querySelector(':scope > .tree-children');
+            if (childrenUl) {
+                if (childrenUl.style.display === 'none') {
+                    childrenUl.style.display = 'block';
+                    icon.classList.add('expanded');
+                    icon.textContent = 'arrow_drop_down';
+                } else {
+                    childrenUl.style.display = 'none';
+                    icon.classList.remove('expanded');
+                    icon.textContent = 'arrow_right';
+                }
+            }
+        }
+
+        function expandAll() {
+            document.querySelectorAll('.tree-children').forEach(el => el.style.display = 'block');
+            document.querySelectorAll('.toggle-icon.folder-toggle').forEach(el => {
+                el.classList.add('expanded');
+                el.textContent = 'arrow_drop_down';
+            });
+        }
+
+        function collapseAll() {
+            const rootChildren = document.querySelector('.tree-root > li > .tree-children');
+            document.querySelectorAll('.tree-children').forEach(el => {
+                if(el !== rootChildren) el.style.display = 'none';
+            });
+            document.querySelectorAll('.toggle-icon.folder-toggle').forEach(el => {
+                el.classList.remove('expanded');
+                el.textContent = 'arrow_right';
+            });
+        }
+
+        function createTreeNode(node, isRoot = false) {
+            const li = document.createElement('li');
+            const isFolder = node.mimeType === 'application/vnd.google-apps.folder';
+            const hasChildren = node.children && node.children.length > 0;
+
+            const nodeContent = document.createElement('div');
+            nodeContent.className = 'tree-node-content';
+
+            const toggleIcon = document.createElement('span');
+            toggleIcon.className = 'material-icons toggle-icon';
+            if (isFolder && hasChildren) {
+                toggleIcon.classList.add('folder-toggle');
+                toggleIcon.textContent = 'arrow_right';
+                toggleIcon.onclick = (e) => toggleNode(e, toggleIcon);
+            } else {
+                toggleIcon.classList.add('empty');
+                toggleIcon.textContent = 'remove';
+            }
+            nodeContent.appendChild(toggleIcon);
+
+            const typeIcon = document.createElement('span');
+            typeIcon.className = \`material-icons type-icon \${getIconClass(node.mimeType)}\`;
+            typeIcon.textContent = getFileIcon(node.mimeType);
+            nodeContent.appendChild(typeIcon);
+
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'tree-node-name ' + (isFolder ? 'folder-name' : '');
+            nameSpan.textContent = node.name;
+            nodeContent.appendChild(nameSpan);
+
+            if (node.size && !isFolder) {
+                const sizeSpan = document.createElement('span');
+                sizeSpan.className = 'tree-node-size';
+                sizeSpan.textContent = formatFileSize(node.size);
+                nodeContent.appendChild(sizeSpan);
+            }
+
+            li.appendChild(nodeContent);
+
+            if (hasChildren) {
+                const childrenUl = document.createElement('ul');
+                childrenUl.className = 'tree-children';
+                childrenUl.style.display = isRoot ? 'block' : 'none';
+
+                node.children
+                    .sort((a, b) => {
+                        const aIsFolder = a.mimeType === 'application/vnd.google-apps.folder';
+                        const bIsFolder = b.mimeType === 'application/vnd.google-apps.folder';
+                        if (aIsFolder && !bIsFolder) return -1;
+                        if (!aIsFolder && bIsFolder) return 1;
+                        return a.name.localeCompare(b.name);
+                    })
+                    .forEach(child => {
+                        childrenUl.appendChild(createTreeNode(child));
+                    });
+
+                li.appendChild(childrenUl);
+            }
+
+            return li;
+        }
+
+        function renderTree(tree, container) {
+            container.innerHTML = '';
+            const ul = document.createElement('ul');
+            ul.className = 'tree-root';
+            const rootLi = createTreeNode(tree, true);
+            ul.appendChild(rootLi);
+            container.appendChild(ul);
+        }
+
+        renderTree(treeData, document.getElementById('tree-container'));
+    </script>
+</body>
+</html>`;
+
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const link = document.createElement('a');
+            link.href = window.URL.createObjectURL(blob);
+            link.download = `${filename.replace(/\s+/g, '_')}.html`;
             link.click();
         }
 
@@ -553,15 +1074,7 @@
         async function fetchDriveFiles() {
             const statusDiv = document.getElementById('status-text');
             document.getElementById('tools-section').style.display = 'none';
-            statusDiv.innerHTML = '<span class="material-icons" style="animation: spin 2s linear infinite;">autorenew</span> Scanning Drive... This may take a moment.';
-
-            // CSS for the spinning icon
-            if(!document.getElementById('spin-style')){
-                const style = document.createElement('style');
-                style.id = 'spin-style';
-                style.innerHTML = '@keyframes spin { 100% { transform: rotate(360deg); } }';
-                document.head.appendChild(style);
-            }
+            statusDiv.innerHTML = '<span class="material-icons spinning" style="vertical-align: middle;">autorenew</span> Scanning Drive... This may take a moment.';
 
             try {
                 let allFiles = [];
@@ -584,17 +1097,17 @@
                     return;
                 }
 
-                statusDiv.innerText = `Successfully mapped ${allFiles.length} files.`;
-                
+                statusDiv.innerHTML = `<span class="material-icons" style="vertical-align: middle; color: #34a853;">check_circle</span> Successfully mapped ${allFiles.length} files and folders!`;
+
                 // Build data globally
                 globalTreeData = buildFileTree(allFiles);
-                
+
                 // Render UI
                 document.getElementById('tools-section').style.display = 'block';
                 renderTree(globalTreeData, document.getElementById('tree-container'));
 
             } catch (err) {
-                statusDiv.innerText = "Error: " + err.message;
+                statusDiv.innerHTML = `<span class="material-icons" style="vertical-align: middle; color: #d93025;">error</span> Error: ${err.message}`;
                 console.error(err);
             }
         }
