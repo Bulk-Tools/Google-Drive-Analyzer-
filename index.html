@@ -5,34 +5,73 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Drive Tree Analyzer</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; }
-        #auth-section, #data-section { margin-bottom: 20px; }
-        #output { white-space: pre-wrap; background: #f4f4f4; padding: 10px; border-radius: 5px; }
+        body { 
+            font-family: sans-serif; 
+            padding: 20px; 
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        #auth-section, #data-section { 
+            margin-bottom: 20px; 
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #357ae8;
+        }
+        #signout_button {
+            background-color: #d93025;
+        }
+        #signout_button:hover {
+            background-color: #c5221f;
+        }
+        #output { 
+            white-space: pre-wrap; 
+            background: #f4f4f4; 
+            padding: 15px; 
+            border-radius: 5px; 
+            overflow-x: auto;
+            border: 1px solid #ddd;
+            margin-top: 15px;
+        }
     </style>
 </head>
 <body>
 
     <h1>Drive Tree Analyzer</h1>
 
+    <!-- Authentication Section -->
     <div id="auth-section">
         <p>Step 1: Authorize access to your Google Drive</p>
-        <button id="authorize_button" onclick="handleAuthClick()">Log In to Google Drive</button>
+        <button id="authorize_button" onclick="handleAuthClick()" style="display: none;">Log In to Google Drive</button>
         <button id="signout_button" onclick="handleSignoutClick()" style="display: none;">Sign Out</button>
     </div>
 
+    <!-- Data Section -->
     <div id="data-section" style="display: none;">
         <p>Step 2: Fetch the structural data</p>
-        <button id="fetch_button" onclick="fetchDriveFiles()">Fetch My Files</button>
+        <button id="fetch_button" onclick="fetchDriveFiles()">Fetch My Files (Test)</button>
         <div id="output"></div>
     </div>
 
+    <!-- Load Google API Libraries -->
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client"></script>
     
     <script>
         // === YOUR CONFIGURATION ===
-        // Paste the Client ID you got from the Google Cloud Console here
-        const CLIENT_ID = '1082194279992-iai58b74r2739sqt6gk06s0odn5km76f.apps.googleusercontent.com';
+        // Your exact Client ID provided
+        const CLIENT_ID = '1082194279992-iai58b74r2739sqt6gk06s0odn5km76f.apps.googleusercontent.com'; 
         
         // We only want read-only access to metadata
         const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
@@ -110,7 +149,7 @@
         async function fetchDriveFiles() {
             document.getElementById('output').innerText = 'Fetching files...\n';
             try {
-                // We are fetching just 10 files for now to prove it works
+                // We are fetching just 10 files for now to prove the connection works
                 const response = await gapi.client.drive.files.list({
                     'pageSize': 10,
                     'fields': 'files(id, name, mimeType, parents)',
@@ -118,19 +157,20 @@
                 
                 const files = response.result.files;
                 if (!files || files.length == 0) {
-                    document.getElementById('output').innerText += 'No files found.';
+                    document.getElementById('output').innerText = 'No files found.';
                     return;
                 }
                 
                 // Print the raw JSON data to the screen so you can see it
-                document.getElementById('output').innerText += JSON.stringify(files, null, 2);
+                document.getElementById('output').innerText = JSON.stringify(files, null, 2);
                 
             } catch (err) {
-                document.getElementById('output').innerText += "Error: " + err.message;
+                document.getElementById('output').innerText = "Error: " + err.message;
             }
         }
     </script>
     
+    <!-- Boot up the libraries when the page loads -->
     <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
     <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
 </body>
