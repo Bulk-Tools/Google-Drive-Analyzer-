@@ -1,16 +1,210 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Google Drive Analyzer - Enterprise Storage Dashboard</title>
-    
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drive Tree Analyzer</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        :root { --primary: #1a73e8; --bg: #f8f9fa; --text: #202124; --muted: #5f6368; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 20px; max-width: 1000px; margin: 0 auto; background: var(--bg); color: var(--text); }
+        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        button { padding: 10px 15px; background: var(--primary); color: white; border: none; border-radius: 5px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+        button:hover { opacity: 0.9; }
+        #signout_button { background: #d93025; }
+        .toolbar { display: flex; gap: 10px; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #ddd; }
+        .secondary { background: white; color: var(--text); border: 1px solid #ddd; }
+        
+        /* Tree UI */
+        ul { list-style: none; padding: 0; margin: 0; }
+        .tree-children { padding-left: 25px; border-left: 2px dashed #ddd; margin-left: 12px; display: none; }
+        .tree-node-content { display: flex; align-items: center; padding: 6px; border-radius: 4px; cursor: pointer; }
+        .tree-node-content:hover { background: #e8f0fe; }
+        .icon { font-size: 20px; margin-right: 8px; color: var(--muted); }
+        .folder-icon { color: #fbbc04; }
+        .pdf-icon { color: #d93025; }
+        .name { flex-grow: 1; font-size: 14px; }
+        .folder-name { font-weight: 600; color: #1a237e; }
+        .size { font-size: 12px; color: var(--muted); background: var(--bg); padding: 2px 6px; border-radius: 10px; }
+        
+        /* Actions */
+        .actions { display: none; gap: 5px; margin-left: 10px; }
+        .tree-node-content:hover .actions { display: flex; }
+        .action-btn { font-size: 16px; color: var(--primary); padding: 4px; border-radius: 50%; }
+        .action-btn:hover { background: #d2e3fc; }
+        
+        #status { font-weight: 500; color: var(--primary); margin-bottom: 15px; }
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div class="card" id="auth-section">
+        <h2 style="color: var(--primary); margin-top: 0;"><span class="material-icons">account_tree</span> Drive Analyzer</h2>
+        <button id="authorize_button" onclick="handleAuthClick()" style="display: none;">Log In to Drive</button>
+        <button id="signout_button" onclick="handleSignoutClick()" style="display: none;">Sign Out</button>
+    </div>
+
+    <div class="card" id="data-section" style="display: none;">
+        <button onclick="fetchDriveFiles()"><span class="material-icons">sync</span> Analyze Drive</button>
+        <div id="status" style="margin-top: 15px;"></div>
+        
+        <div id="tools" style="display: none;">
+            <div class="toolbar">
+                <button class="secondary" onclick="toggleAll('block')"><span class="material-icons">unfold_more</span> Expand All</button>
+                <button class="secondary" onclick="toggleAll('none')"><span class="material-icons">unfold_less</span> Collapse All</button>
+                <div style="flex-grow: 1;"></div>
+                <button onclick="exportToPDF('tree-container', 'Full_Drive_Tree')"><span class="material-icons">picture_as_pdf</span> Export PDF</button>
+                <button onclick="exportToTXT(treeData, 'Full_Drive_Tree')"><span class="material-icons">description</span> Export TXT</button>
+            </div>
+            <div id="tree-container"></div>
+        </div>
+    </div>
+
     <script src="https://apis.google.com/js/api.js"></script>
-    <script src="https://accounts.google.com/gsi/client" async></script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+    <script src="https://accounts.google.com/gsi/client"></script>
+    
+    <script>
+        const CLIENT_ID = '1082194279992-76lg6issm569spcojof6n1ei0g60qnij.apps.googleusercontent.com'; 
+        let tokenClient, treeData = null;
+
+        // --- AUTHENTICATION ---
+        gapi.load('client', async () => {
+            await gapi.client.init({ discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'] });
+            document.getElementById('authorize_button').style.display = 'inline-flex';
+        });
+
+        window.onload = () => {
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID, scope: 'https://www.googleapis.com/auth/drive.readonly',
+                callback: (resp) => {
+                    if (resp.error) return;
+                    document.getElementById('auth-section').style.display = 'none';
+                    document.getElementById('data-section').style.display = 'block';
+                    document.getElementById('signout_button').style.display = 'inline-flex';
+                }
+            });
+        };
+
+        function handleAuthClick() { tokenClient.requestAccessToken({ prompt: gapi.client.getToken() ? '' : 'consent' }); }
+        function handleSignoutClick() {
+            google.accounts.oauth2.revoke(gapi.client.getToken().access_token);
+            gapi.client.setToken('');
+            location.reload();
+        }
+
+        // --- FETCH & BUILD ---
+        async function fetchDriveFiles() {
+            const status = document.getElementById('status');
+            document.getElementById('tools').style.display = 'none';
+            status.innerHTML = '<span class="material-icons spin">autorenew</span> Scanning...';
+
+            let files = [], pageToken = null;
+            try {
+                do {
+                    const res = await gapi.client.drive.files.list({ pageSize: 1000, fields: 'nextPageToken, files(id, name, mimeType, parents, size)', pageToken: pageToken || '' });
+                    files = files.concat(res.result.files || []);
+                    pageToken = res.result.nextPageToken;
+                } while (pageToken);
+
+                status.innerHTML = `<span class="material-icons">check_circle</span> Mapped ${files.length} items.`;
+                treeData = buildTree(files);
+                renderTree(treeData, document.getElementById('tree-container'));
+                document.getElementById('tools').style.display = 'block';
+            } catch (err) { status.innerText = `Error: ${err.message}`; }
+        }
+
+        function buildTree(files) {
+            let map = {}, root = { id: 'root', name: 'My Drive', mimeType: 'application/vnd.google-apps.folder', children: [] };
+            files.forEach(f => map[f.id] = { ...f, children: [] });
+            files.forEach(f => {
+                if (!f.parents) root.children.push(map[f.id]);
+                else if (map[f.parents[0]]) map[f.parents[0]].children.push(map[f.id]);
+                else root.children.push(map[f.id]);
+            });
+            return root;
+        }
+
+        // --- UI & RENDER ---
+        function toggleAll(display) {
+            document.querySelectorAll('.tree-children').forEach(el => el.style.display = display);
+            document.querySelectorAll('.toggle-icon').forEach(el => el.textContent = display === 'block' ? 'arrow_drop_down' : 'arrow_right');
+        }
+
+        function toggleNode(e, el) {
+            e.stopPropagation();
+            let childUl = el.closest('li').querySelector(':scope > ul');
+            if (!childUl) return;
+            const isHidden = childUl.style.display === 'none';
+            childUl.style.display = isHidden ? 'block' : 'none';
+            el.textContent = isHidden ? 'arrow_drop_down' : 'arrow_right';
+        }
+
+        function renderTree(node, container, isRoot = true) {
+            const isFolder = node.mimeType === 'application/vnd.google-apps.folder';
+            let li = document.createElement('li');
+            
+            let content = `<div class="tree-node-content">
+                <span class="material-icons toggle-icon icon" onclick="toggleNode(event, this)">${isFolder && node.children.length ? 'arrow_right' : ''}</span>
+                <span class="material-icons icon ${isFolder ? 'folder-icon' : (node.mimeType.includes('pdf') ? 'pdf-icon' : '')}">${isFolder ? 'folder' : 'description'}</span>
+                <span class="name ${isFolder ? 'folder-name' : ''}">${node.name}</span>
+                ${node.size && !isFolder ? `<span class="size">${(node.size/1024/1024).toFixed(2)} MB</span>` : ''}
+            </div>`;
+            li.innerHTML = content;
+
+            if (isFolder && !isRoot) {
+                let actions = document.createElement('div');
+                actions.className = 'actions';
+                actions.innerHTML = `<span class="material-icons action-btn" title="PDF" onclick="event.stopPropagation(); exportFolder(this, '${node.name}')">picture_as_pdf</span>`;
+                li.querySelector('.tree-node-content').appendChild(actions);
+            }
+
+            if (node.children && node.children.length) {
+                let ul = document.createElement('ul');
+                ul.className = 'tree-children';
+                if (isRoot) ul.style.display = 'block';
+                
+                node.children.sort((a,b) => (b.mimeType.includes('folder') ? 1 : 0) - (a.mimeType.includes('folder') ? 1 : 0) || a.name.localeCompare(b.name))
+                             .forEach(child => ul.appendChild(renderTree(child, null, false)));
+                li.appendChild(ul);
+            }
+
+            if (container) { container.innerHTML = ''; let rootUl = document.createElement('ul'); rootUl.appendChild(li); container.appendChild(rootUl); }
+            return li;
+        }
+
+        // --- EXPORTS ---
+        function exportToPDF(elementId, filename) {
+            toggleAll('block'); // Expand everything
+            const el = document.getElementById(elementId).cloneNode(true);
+            el.querySelectorAll('.actions').forEach(a => a.remove()); // Clean UI
+            html2pdf().set({ margin: 10, filename: filename+'.pdf', jsPDF: { format: 'a4' } }).from(el).save();
+        }
+
+        function exportFolder(btn, name) {
+            let clone = btn.closest('li').cloneNode(true);
+            clone.querySelectorAll('.tree-children').forEach(el => el.style.display = 'block');
+            clone.querySelectorAll('.actions').forEach(el => el.remove());
+            html2pdf().set({ margin: 10, filename: name+'.pdf', jsPDF: { format: 'a4' } }).from(clone).save();
+        }
+
+        function exportToTXT(node) {
+            let txt = `${node.name}\n`;
+            function buildTxt(n, prefix = '', isLast = true) {
+                if (!n.children) return '';
+                let res = '';
+                n.children.forEach((c, i) => {
+                    let last = i === n.children.length - 1;
+                    res += prefix + (last ? '└── ' : '├── ') + c.name + '\n' + buildTxt(c, prefix + (last ? '    ' : '│   '), last);
+                });
+                return res;
+            }
+            const blob = new Blob([txt + buildTxt(node)], { type: 'text/plain' });
+            const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'Drive_Tree.txt'; link.click();
+        }
+    </script>
+</body>
 </html>
