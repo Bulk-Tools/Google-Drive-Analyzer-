@@ -64,9 +64,32 @@
         .processed-file-item.success { color: #34a853; }
         .processed-file-item.error { color: #d93025; }
         .processed-file-item.skipped { color: #f9ab00; }
+
+        /* Export Progress Styles */
+        .export-progress-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; display: none; }
+        .export-progress-container { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); z-index: 1000; min-width: 400px; display: none; }
+        .export-progress-title { font-size: 18px; font-weight: 600; color: var(--text); margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
+        .export-progress-status { font-size: 14px; color: var(--muted); margin-bottom: 10px; }
+        .export-progress-bar-bg { background: #e0e0e0; border-radius: 10px; height: 28px; overflow: hidden; margin-bottom: 15px; }
+        .export-progress-bar-fill { background: linear-gradient(90deg, #34a853 0%, #5bb974 100%); height: 100%; transition: width 0.2s ease; display: flex; align-items: center; justify-content: center; color: white; font-size: 13px; font-weight: 600; }
     </style>
 </head>
 <body>
+
+    <!-- Export Progress Modal -->
+    <div class="export-progress-overlay" id="export-progress-overlay"></div>
+    <div class="export-progress-container" id="export-progress-container">
+        <div class="export-progress-title">
+            <span class="material-icons spin">sync</span>
+            <span id="export-progress-title-text">Generating Export...</span>
+        </div>
+        <div class="export-progress-status" id="export-progress-status">Preparing data...</div>
+        <div class="export-progress-bar-bg">
+            <div class="export-progress-bar-fill" id="export-progress-bar-fill" style="width: 0%;">
+                <span id="export-progress-percentage">0%</span>
+            </div>
+        </div>
+    </div>
 
     <div class="card" id="auth-section">
         <h2 style="color: var(--primary); margin-top: 0;"><span class="material-icons">account_tree</span> Drive Analyzer</h2>
@@ -254,33 +277,372 @@
         }
 
         // --- EXPORTS ---
-        function exportToPDF(elementId, filename) {
-            toggleAll('block'); // Expand everything
-            const el = document.getElementById(elementId).cloneNode(true);
-            el.querySelectorAll('.actions').forEach(a => a.remove()); // Clean UI
-            html2pdf().set({ margin: 10, filename: filename+'.pdf', jsPDF: { format: 'a4' } }).from(el).save();
+
+        // Show/hide export progress modal
+        function showExportProgress(title) {
+            document.getElementById('export-progress-overlay').style.display = 'block';
+            document.getElementById('export-progress-container').style.display = 'block';
+            document.getElementById('export-progress-title-text').textContent = title;
+            document.getElementById('export-progress-status').textContent = 'Preparing data...';
+            document.getElementById('export-progress-bar-fill').style.width = '0%';
+            document.getElementById('export-progress-percentage').textContent = '0%';
         }
 
-        function exportFolder(btn, name) {
-            let clone = btn.closest('li').cloneNode(true);
-            clone.querySelectorAll('.tree-children').forEach(el => el.style.display = 'block');
-            clone.querySelectorAll('.actions').forEach(el => el.remove());
-            html2pdf().set({ margin: 10, filename: name+'.pdf', jsPDF: { format: 'a4' } }).from(clone).save();
+        function hideExportProgress() {
+            document.getElementById('export-progress-overlay').style.display = 'none';
+            document.getElementById('export-progress-container').style.display = 'none';
         }
 
-        function exportToTXT(node) {
-            let txt = `${node.name}\n`;
-            function buildTxt(n, prefix = '', isLast = true) {
-                if (!n.children) return '';
-                let res = '';
-                n.children.forEach((c, i) => {
-                    let last = i === n.children.length - 1;
-                    res += prefix + (last ? '└── ' : '├── ') + c.name + '\n' + buildTxt(c, prefix + (last ? '    ' : '│   '), last);
-                });
-                return res;
+        function updateExportProgress(percentage, status) {
+            document.getElementById('export-progress-bar-fill').style.width = percentage + '%';
+            document.getElementById('export-progress-percentage').textContent = Math.round(percentage) + '%';
+            if (status) {
+                document.getElementById('export-progress-status').textContent = status;
             }
-            const blob = new Blob([txt + buildTxt(node)], { type: 'text/plain' });
-            const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'Drive_Tree.txt'; link.click();
+        }
+
+        // Calculate statistics for a node tree
+        function calculateStats(node) {
+            let stats = { totalFiles: 0, totalFolders: 0, totalSize: 0, fileTypes: {} };
+
+            function traverse(n) {
+                if (!n) return;
+
+                const isFolder = n.mimeType === 'application/vnd.google-apps.folder';
+                if (isFolder) {
+                    stats.totalFolders++;
+                } else {
+                    stats.totalFiles++;
+                    if (n.size) stats.totalSize += parseInt(n.size);
+
+                    // Track file types
+                    const ext = n.name.includes('.') ? n.name.split('.').pop().toLowerCase() : 'no extension';
+                    stats.fileTypes[ext] = (stats.fileTypes[ext] || 0) + 1;
+                }
+
+                if (n.children) {
+                    n.children.forEach(child => traverse(child));
+                }
+            }
+
+            traverse(node);
+            return stats;
+        }
+
+        // Format bytes to human readable
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Build structured HTML for PDF export
+        function buildStructuredHTML(node, stats) {
+            let html = `
+                <div style="font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #202124;">
+                    <div style="border-bottom: 3px solid #1a73e8; padding-bottom: 15px; margin-bottom: 25px;">
+                        <h1 style="color: #1a73e8; margin: 0; font-size: 28px; display: flex; align-items: center;">
+                            📊 ${node.name}
+                        </h1>
+                        <p style="color: #5f6368; margin: 10px 0 0 0; font-size: 14px;">
+                            Generated on ${new Date().toLocaleString()}
+                        </p>
+                    </div>
+
+                    <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 25px; border-left: 4px solid #34a853;">
+                        <h2 style="margin: 0 0 15px 0; color: #202124; font-size: 18px;">📈 Summary Statistics</h2>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+                            <div style="background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                                <div style="color: #5f6368; font-size: 12px; margin-bottom: 5px;">Total Folders</div>
+                                <div style="color: #1a73e8; font-size: 24px; font-weight: 600;">${stats.totalFolders}</div>
+                            </div>
+                            <div style="background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                                <div style="color: #5f6368; font-size: 12px; margin-bottom: 5px;">Total Files</div>
+                                <div style="color: #34a853; font-size: 24px; font-weight: 600;">${stats.totalFiles}</div>
+                            </div>
+                            <div style="background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); grid-column: span 2;">
+                                <div style="color: #5f6368; font-size: 12px; margin-bottom: 5px;">Total Size</div>
+                                <div style="color: #f9ab00; font-size: 24px; font-weight: 600;">${formatBytes(stats.totalSize)}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    ${Object.keys(stats.fileTypes).length > 0 ? `
+                    <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 25px; border-left: 4px solid #f9ab00;">
+                        <h2 style="margin: 0 0 15px 0; color: #202124; font-size: 18px;">📁 File Types Distribution</h2>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                            ${Object.entries(stats.fileTypes).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([type, count]) => `
+                                <div style="background: white; padding: 10px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-size: 13px;">
+                                    <span style="color: #5f6368;">.${type}</span>
+                                    <span style="color: #1a73e8; font-weight: 600; float: right;">${count}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    ` : ''}
+
+                    <div style="margin-top: 30px;">
+                        <h2 style="color: #202124; font-size: 20px; margin-bottom: 15px; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px;">
+                            🗂️ Folder Structure
+                        </h2>
+                        ${buildStructuredTreeHTML(node)}
+                    </div>
+                </div>
+            `;
+            return html;
+        }
+
+        function buildStructuredTreeHTML(node, level = 0) {
+            if (!node) return '';
+
+            const isFolder = node.mimeType === 'application/vnd.google-apps.folder';
+            const indent = level * 20;
+            const icon = isFolder ? '📁' : '📄';
+            const sizeText = node.size && !isFolder ? ` <span style="color: #5f6368; font-size: 11px;">(${formatBytes(parseInt(node.size))})</span>` : '';
+
+            let html = '';
+            if (level > 0) {  // Don't show root node
+                html += `
+                    <div style="margin-left: ${indent}px; padding: 8px; border-left: 2px solid ${isFolder ? '#fbbc04' : '#e0e0e0'}; margin-bottom: 5px;">
+                        <span style="font-size: 14px;">${icon}</span>
+                        <span style="color: ${isFolder ? '#1a237e' : '#202124'}; font-weight: ${isFolder ? '600' : '400'}; font-size: 13px; margin-left: 8px;">
+                            ${node.name}${sizeText}
+                        </span>
+                    </div>
+                `;
+            }
+
+            if (node.children && node.children.length > 0) {
+                node.children.forEach(child => {
+                    html += buildStructuredTreeHTML(child, level + 1);
+                });
+            }
+
+            return html;
+        }
+
+        async function exportToPDF(elementId, filename) {
+            showExportProgress('Generating PDF...');
+
+            try {
+                // Step 1: Calculate statistics (10%)
+                updateExportProgress(10, 'Analyzing folder structure...');
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                const stats = calculateStats(treeData);
+
+                // Step 2: Build HTML structure (30%)
+                updateExportProgress(30, 'Building document structure...');
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                const htmlContent = buildStructuredHTML(treeData, stats);
+
+                // Step 3: Create temporary element (50%)
+                updateExportProgress(50, 'Preparing PDF layout...');
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = htmlContent;
+                document.body.appendChild(tempDiv);
+
+                // Step 4: Generate PDF (70%)
+                updateExportProgress(70, 'Generating PDF document...');
+                await new Promise(resolve => setTimeout(resolve, 200));
+
+                const opt = {
+                    margin: [15, 15, 15, 15],
+                    filename: filename + '.pdf',
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                };
+
+                // Step 5: Save PDF (90%)
+                updateExportProgress(90, 'Finalizing PDF...');
+                await html2pdf().set(opt).from(tempDiv).save();
+
+                // Cleanup
+                document.body.removeChild(tempDiv);
+
+                // Step 6: Complete (100%)
+                updateExportProgress(100, 'PDF generated successfully!');
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                hideExportProgress();
+            } catch (error) {
+                console.error('PDF export error:', error);
+                updateExportProgress(100, 'Error generating PDF. Please try again.');
+                setTimeout(hideExportProgress, 2000);
+            }
+        }
+
+        async function exportFolder(btn, name) {
+            showExportProgress('Generating Folder PDF...');
+
+            try {
+                // Get the folder node from the clicked button
+                const folderLi = btn.closest('li');
+                const folderNameEl = folderLi.querySelector('.folder-name');
+
+                // Find the corresponding node in treeData
+                function findNode(node, targetName) {
+                    if (node.name === targetName && node.mimeType === 'application/vnd.google-apps.folder') {
+                        return node;
+                    }
+                    if (node.children) {
+                        for (let child of node.children) {
+                            const found = findNode(child, targetName);
+                            if (found) return found;
+                        }
+                    }
+                    return null;
+                }
+
+                const folderNode = findNode(treeData, name);
+                if (!folderNode) {
+                    throw new Error('Folder node not found');
+                }
+
+                updateExportProgress(20, 'Analyzing folder...');
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                const stats = calculateStats(folderNode);
+
+                updateExportProgress(50, 'Building document...');
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                const htmlContent = buildStructuredHTML(folderNode, stats);
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = htmlContent;
+                document.body.appendChild(tempDiv);
+
+                updateExportProgress(80, 'Generating PDF...');
+                await new Promise(resolve => setTimeout(resolve, 200));
+
+                const opt = {
+                    margin: [15, 15, 15, 15],
+                    filename: name + '.pdf',
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                };
+
+                await html2pdf().set(opt).from(tempDiv).save();
+                document.body.removeChild(tempDiv);
+
+                updateExportProgress(100, 'PDF generated successfully!');
+                await new Promise(resolve => setTimeout(resolve, 500));
+                hideExportProgress();
+            } catch (error) {
+                console.error('Folder PDF export error:', error);
+                updateExportProgress(100, 'Error generating PDF. Please try again.');
+                setTimeout(hideExportProgress, 2000);
+            }
+        }
+
+        async function exportToTXT(node) {
+            showExportProgress('Generating TXT File...');
+
+            try {
+                // Step 1: Calculate statistics (20%)
+                updateExportProgress(20, 'Analyzing structure...');
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                const stats = calculateStats(node);
+
+                // Step 2: Build text content (50%)
+                updateExportProgress(50, 'Building text structure...');
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                let txt = '';
+                txt += '╔════════════════════════════════════════════════════════════════╗\n';
+                txt += '║            GOOGLE DRIVE FOLDER STRUCTURE REPORT                ║\n';
+                txt += '╚════════════════════════════════════════════════════════════════╝\n\n';
+
+                txt += `📊 Report Generated: ${new Date().toLocaleString()}\n`;
+                txt += `📁 Root: ${node.name}\n\n`;
+
+                txt += '┌────────────────────────────────────────────────────────────────┐\n';
+                txt += '│                      SUMMARY STATISTICS                        │\n';
+                txt += '├────────────────────────────────────────────────────────────────┤\n';
+                txt += `│  Total Folders:          ${String(stats.totalFolders).padStart(10)}                          │\n`;
+                txt += `│  Total Files:            ${String(stats.totalFiles).padStart(10)}                          │\n`;
+                txt += `│  Total Size:             ${formatBytes(stats.totalSize).padStart(10)}                          │\n`;
+                txt += '└────────────────────────────────────────────────────────────────┘\n\n';
+
+                if (Object.keys(stats.fileTypes).length > 0) {
+                    txt += '┌────────────────────────────────────────────────────────────────┐\n';
+                    txt += '│                   FILE TYPES DISTRIBUTION                      │\n';
+                    txt += '├────────────────────────────────────────────────────────────────┤\n';
+
+                    const sortedTypes = Object.entries(stats.fileTypes).sort((a, b) => b[1] - a[1]);
+                    sortedTypes.forEach(([type, count]) => {
+                        const typeStr = `.${type}`.padEnd(25);
+                        const countStr = String(count).padStart(8);
+                        txt += `│  ${typeStr}${countStr} file(s)                     │\n`;
+                    });
+
+                    txt += '└────────────────────────────────────────────────────────────────┘\n\n';
+                }
+
+                txt += '╔════════════════════════════════════════════════════════════════╗\n';
+                txt += '║                     FOLDER STRUCTURE                           ║\n';
+                txt += '╚════════════════════════════════════════════════════════════════╝\n\n';
+
+                txt += `${node.name}/\n`;
+
+                function buildTxt(n, prefix = '', isLast = true) {
+                    if (!n.children || n.children.length === 0) return '';
+
+                    let res = '';
+                    const sortedChildren = [...n.children].sort((a, b) => {
+                        const aIsFolder = a.mimeType === 'application/vnd.google-apps.folder';
+                        const bIsFolder = b.mimeType === 'application/vnd.google-apps.folder';
+                        if (aIsFolder !== bIsFolder) return bIsFolder ? 1 : -1;
+                        return a.name.localeCompare(b.name);
+                    });
+
+                    sortedChildren.forEach((c, i) => {
+                        const last = i === sortedChildren.length - 1;
+                        const isFolder = c.mimeType === 'application/vnd.google-apps.folder';
+                        const icon = isFolder ? '📁' : '📄';
+                        const sizeText = c.size && !isFolder ? ` [${formatBytes(parseInt(c.size))}]` : '';
+
+                        res += prefix + (last ? '└── ' : '├── ') + icon + ' ' + c.name + sizeText + '\n';
+                        res += buildTxt(c, prefix + (last ? '    ' : '│   '), last);
+                    });
+
+                    return res;
+                }
+
+                txt += buildTxt(node);
+
+                txt += '\n' + '═'.repeat(64) + '\n';
+                txt += 'End of Report\n';
+                txt += `Generated by Google Drive Analyzer\n`;
+
+                // Step 3: Create and download file (90%)
+                updateExportProgress(90, 'Creating file...');
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = node.name + '_Structure.txt';
+                link.click();
+
+                // Step 4: Complete (100%)
+                updateExportProgress(100, 'TXT file generated successfully!');
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                hideExportProgress();
+            } catch (error) {
+                console.error('TXT export error:', error);
+                updateExportProgress(100, 'Error generating TXT file. Please try again.');
+                setTimeout(hideExportProgress, 2000);
+            }
         }
 
         // --- BULK RENAME FUNCTIONS ---
