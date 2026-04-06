@@ -95,6 +95,11 @@
                     <span id="progress-percentage">0%</span>
                 </div>
             </div>
+            <div style="margin-top: 10px;">
+                <button id="stop-button" onclick="stopRenameProcess()" style="background: #d93025;">
+                    <span class="material-icons">stop</span> Stop Process
+                </button>
+            </div>
             <div class="processed-files" id="processed-files">
                 <div class="processed-files-title">Processed Files:</div>
                 <div id="processed-files-list"></div>
@@ -280,6 +285,7 @@
 
         // --- BULK RENAME FUNCTIONS ---
         let searchResults = [];
+        let shouldStopRenaming = false;
 
         function searchFilesWithPrefix() {
             const prefix = document.getElementById('search-prefix').value.trim();
@@ -368,6 +374,12 @@
             return Array.from(checkboxes).map(cb => searchResults[parseInt(cb.dataset.index)]);
         }
 
+        function stopRenameProcess() {
+            shouldStopRenaming = true;
+            document.getElementById('stop-button').disabled = true;
+            document.getElementById('stop-button').innerHTML = '<span class="material-icons">stop</span> Stopping...';
+        }
+
         async function removePrefix() {
             const prefix = document.getElementById('search-prefix').value.trim();
             const selected = getSelectedFiles();
@@ -381,6 +393,9 @@
                 return;
             }
 
+            // Reset stop flag
+            shouldStopRenaming = false;
+
             const statusEl = document.getElementById('rename-status');
             const progressContainer = document.getElementById('progress-container');
             const progressBar = document.getElementById('progress-bar-fill');
@@ -388,18 +403,31 @@
             const progressCount = document.getElementById('progress-count');
             const progressPercentage = document.getElementById('progress-percentage');
             const processedFilesList = document.getElementById('processed-files-list');
+            const stopButton = document.getElementById('stop-button');
 
             // Show progress bar and hide results section during processing
             progressContainer.style.display = 'block';
             document.getElementById('results-section').style.display = 'none';
             statusEl.innerHTML = '';
             processedFilesList.innerHTML = '';
+            stopButton.disabled = false;
+            stopButton.innerHTML = '<span class="material-icons">stop</span> Stop Process';
 
             let successful = 0, failed = 0, skipped = 0;
             const errors = [];
             const processedFiles = [];
 
             for (let i = 0; i < selected.length; i++) {
+                // Check if user requested to stop
+                if (shouldStopRenaming) {
+                    progressText.textContent = 'Process stopped by user';
+                    const stopMsg = document.createElement('div');
+                    stopMsg.className = 'processed-file-item skipped';
+                    stopMsg.textContent = `⚠️ Process stopped. Remaining ${selected.length - i} file(s) were not processed.`;
+                    processedFilesList.appendChild(stopMsg);
+                    break;
+                }
+
                 const file = selected[i];
                 const newName = file.name.substring(prefix.length).trim();
                 const currentProgress = i + 1;
@@ -449,9 +477,13 @@
             }
 
             // Update final status
-            progressText.textContent = 'Processing complete!';
+            if (!shouldStopRenaming) {
+                progressText.textContent = 'Processing complete!';
+            }
 
-            let resultMsg = `<span class="material-icons" style="color: #34a853;">check_circle</span> `;
+            let resultMsg = shouldStopRenaming
+                ? `<span class="material-icons" style="color: #f9ab00;">warning</span> Process stopped. `
+                : `<span class="material-icons" style="color: #34a853;">check_circle</span> `;
             resultMsg += `Renamed ${successful} file(s)`;
             if (skipped > 0) resultMsg += `, skipped ${skipped} (would be empty)`;
             if (failed > 0) resultMsg += `, <span style="color: #d93025;">failed ${failed}</span>`;
@@ -462,6 +494,9 @@
                 console.error('Rename errors:', errors);
                 statusEl.innerHTML += '<br><span style="color: var(--muted); font-size: 12px;">Check console for detailed error messages</span>';
             }
+
+            // Disable stop button after processing is done
+            stopButton.disabled = true;
 
             // Show results section again after a brief delay
             setTimeout(() => {
