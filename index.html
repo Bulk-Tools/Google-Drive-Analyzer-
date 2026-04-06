@@ -417,65 +417,85 @@
             const errors = [];
             const processedFiles = [];
 
-            for (let i = 0; i < selected.length; i++) {
-                // Check if user requested to stop
+            // Parallel processing with batching for extreme speed
+            const BATCH_SIZE = 50; // Process 50 files concurrently
+            let completed = 0;
+
+            // Function to rename a single file
+            async function renameFile(file, index) {
                 if (shouldStopRenaming) {
-                    progressText.textContent = 'Process stopped by user';
-                    const stopMsg = document.createElement('div');
-                    stopMsg.className = 'processed-file-item skipped';
-                    stopMsg.textContent = `⚠️ Process stopped. Remaining ${selected.length - i} file(s) were not processed.`;
-                    processedFilesList.appendChild(stopMsg);
-                    break;
+                    return { status: 'stopped', file };
                 }
 
-                const file = selected[i];
                 const newName = file.name.substring(prefix.length).trim();
-                const currentProgress = i + 1;
-                const percentage = Math.round((currentProgress / selected.length) * 100);
-
-                // Update progress bar
-                progressBar.style.width = percentage + '%';
-                progressPercentage.textContent = percentage + '%';
-                progressCount.textContent = `${currentProgress} / ${selected.length}`;
-                progressText.textContent = 'Processing files...';
-
-                let status = 'error';
-                let displayMessage = '';
 
                 if (!newName) {
+                    return { status: 'skipped', file, message: `⚠️ Skipped: "${file.name}" (would result in empty name)` };
+                }
+
+                try {
+                    await gapi.client.drive.files.update({
+                        fileId: file.id,
+                        resource: { name: newName }
+                    });
+                    return { status: 'success', file, newName, message: `✓ Renamed: "${file.name}" → "${newName}"` };
+                } catch (err) {
+                    const errorMsg = err.result?.error?.message || err.message || JSON.stringify(err);
+                    return { status: 'error', file, error: errorMsg, message: `✗ Failed: "${file.name}" - ${errorMsg}` };
+                }
+            }
+
+            // Function to update UI with a result
+            function displayResult(result) {
+                completed++;
+                const percentage = Math.round((completed / selected.length) * 100);
+                progressBar.style.width = percentage + '%';
+                progressPercentage.textContent = percentage + '%';
+                progressCount.textContent = `${completed} / ${selected.length}`;
+
+                if (result.status === 'success') {
+                    successful++;
+                } else if (result.status === 'error') {
+                    failed++;
+                    errors.push(`${result.file.name}: ${result.error}`);
+                } else if (result.status === 'skipped') {
                     skipped++;
-                    status = 'skipped';
-                    displayMessage = `⚠️ Skipped: "${file.name}" (would result in empty name)`;
-                    processedFiles.push({ name: file.name, status, message: displayMessage });
-                } else {
-                    try {
-                        await gapi.client.drive.files.update({
-                            fileId: file.id,
-                            resource: { name: newName }
-                        });
-                        successful++;
-                        status = 'success';
-                        displayMessage = `✓ Renamed: "${file.name}" → "${newName}"`;
-                        processedFiles.push({ name: file.name, newName, status, message: displayMessage });
-                    } catch (err) {
-                        failed++;
-                        status = 'error';
-                        // Extract error message from various possible error structures
-                        const errorMsg = err.result?.error?.message || err.message || JSON.stringify(err);
-                        displayMessage = `✗ Failed: "${file.name}" - ${errorMsg}`;
-                        errors.push(`${file.name}: ${errorMsg}`);
-                        processedFiles.push({ name: file.name, status, message: displayMessage, error: errorMsg });
-                    }
                 }
 
                 // Add to processed files list
                 const fileItem = document.createElement('div');
-                fileItem.className = `processed-file-item ${status}`;
-                fileItem.textContent = displayMessage;
+                fileItem.className = `processed-file-item ${result.status}`;
+                fileItem.textContent = result.message;
                 processedFilesList.appendChild(fileItem);
 
                 // Auto-scroll to bottom to show latest processed file
                 document.getElementById('processed-files').scrollTop = document.getElementById('processed-files').scrollHeight;
+            }
+
+            // Process files in batches for maximum speed
+            for (let i = 0; i < selected.length; i += BATCH_SIZE) {
+                if (shouldStopRenaming) {
+                    progressText.textContent = 'Process stopped by user';
+                    const stopMsg = document.createElement('div');
+                    stopMsg.className = 'processed-file-item skipped';
+                    stopMsg.textContent = `⚠️ Process stopped. Remaining ${selected.length - completed} file(s) were not processed.`;
+                    processedFilesList.appendChild(stopMsg);
+                    break;
+                }
+
+                const batch = selected.slice(i, i + BATCH_SIZE);
+                progressText.textContent = `Processing batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(selected.length / BATCH_SIZE)}...`;
+
+                // Process entire batch in parallel
+                const batchPromises = batch.map((file, index) => renameFile(file, i + index));
+                const results = await Promise.all(batchPromises);
+
+                // Update UI with all results from this batch
+                results.forEach(result => {
+                    if (result.status !== 'stopped') {
+                        displayResult(result);
+                    }
+                });
             }
 
             // Update final status
