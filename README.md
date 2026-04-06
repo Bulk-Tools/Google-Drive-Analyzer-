@@ -1,192 +1,184 @@
-# Google Drive Analyzer - Enterprise Storage Dashboard
+# Google Drive Analyzer with Bulk Rename
 
-A modern, enterprise-grade storage analytics dashboard for Google Drive built with React, Vite, Tailwind CSS, and shadcn/ui. Visualize your Drive data with interactive charts, treemaps, and powerful insights.
+A lightweight, single-page application for analyzing and managing your Google Drive files. Visualize your Drive structure as an interactive tree and perform bulk operations like renaming files with specific prefixes.
 
-![Dashboard Preview](https://img.shields.io/badge/Status-In%20Development-yellow)
-![React](https://img.shields.io/badge/React-18.2-blue)
-![Vite](https://img.shields.io/badge/Vite-5.1-purple)
-![Tailwind](https://img.shields.io/badge/Tailwind-3.4-cyan)
+![Status](https://img.shields.io/badge/Status-Active-green)
+![License](https://img.shields.io/badge/License-MIT-blue)
 
 ## ✨ Features
 
-### 📊 Visual Analytics
-- **Storage Overview Dashboard** - At-a-glance view of total, used, and free space with elegant progress bars
-- **File Type Breakdown** - Interactive donut charts (coming soon)
-- **Treemap Visualization** - DaisyDisk-style visual representation (coming soon)
+### 📊 Drive Analysis
+- **File Tree Visualization** - Browse your entire Google Drive in an interactive tree structure
+- **File Size Display** - See file sizes at a glance
+- **Folder Export** - Export individual folders or entire drive tree to PDF or TXT
 
-### 🗂️ Advanced Features (Coming Soon)
-- Virtualized file tree for 50,000+ files
-- Data grid view with sortable columns
-- Real-time search and smart filters
-- Professional PDF/CSV/JSON exports
-- Intelligent insights (storage hogs, clutter detection)
+### 🔄 Bulk Rename Operations
+- **Smart Search** - Find all files starting with a specific prefix (e.g., "Copy of")
+- **Preview Changes** - See what files will be renamed before committing
+- **Selective Rename** - Choose which files to rename with checkboxes
+- **Batch Processing** - Rename multiple files at once
+- **Progress Tracking** - Real-time feedback during bulk operations
+- **Auto-refresh** - Drive tree automatically updates after renaming
 
-### 🎨 Premium UI/UX
-- Modern design with smooth animations (Framer Motion)
-- Beautiful loading skeletons
-- Fully responsive layout
+### 🎨 User Experience
+- Clean, modern Material Design interface
+- No installation required - runs entirely in browser
+- Fast and responsive
+- Collapsible tree structure
+- Color-coded file types
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### No Installation Needed!
 
-- Node.js 18+ and npm
-- Google Cloud Project with Drive API enabled
-- OAuth 2.0 credentials
+This is a standalone HTML application. Simply:
 
-### Installation
+1. **Download** the `index.html` file or visit the hosted version
+2. **Open** it in any modern web browser
+3. **Authorize** with your Google account
+4. **Start analyzing** and managing your Drive!
 
-1. **Clone and install**
-   ```bash
-   git clone https://github.com/Bulk-Tools/Google-Drive-Analyzer-.git
-   cd Google-Drive-Analyzer-
-   npm install
-   ```
+### For Development
 
-2. **Configure Google OAuth** (see below)
+If you want to run it locally:
 
-3. **Start development server**
-   ```bash
-   npm run dev
-   ```
-
-4. **Open browser**: http://localhost:5173
+```bash
+git clone https://github.com/Bulk-Tools/Google-Drive-Analyzer-.git
+cd Google-Drive-Analyzer-
+# Serve with any HTTP server, e.g.:
+python3 -m http.server 8000
+# Then open http://localhost:8000 in your browser
+```
 
 ## 🔐 Google Cloud Setup
 
-### Step 1: Create a Google Cloud Project
+### Prerequisites
+
+You'll need a Google Cloud Project with the Drive API enabled. The application comes pre-configured with a Client ID, but you can use your own:
+
+### Using Your Own OAuth Credentials
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project or select an existing one
-3. Enable the **Google Drive API**:
-   - Navigate to "APIs & Services" > "Library"
-   - Search for "Google Drive API"
-   - Click "Enable"
+3. Enable the **Google Drive API**
+4. Configure OAuth consent screen
+5. Create OAuth 2.0 credentials (Web application type)
+6. Add authorized JavaScript origins:
+   - Your domain (e.g., `https://yourdomain.com`)
+   - `http://localhost:8000` (for local testing)
+7. Copy your Client ID
+8. Update the `CLIENT_ID` constant in `index.html` (line 111)
 
-### Step 2: Configure OAuth Consent Screen
+### Required OAuth Scopes
 
-1. Go to "APIs & Services" > "OAuth consent screen"
-2. Choose "External" user type (unless you have a Google Workspace)
-3. Fill in the required fields:
-   - App name: "Google Drive Analyzer" (or your preferred name)
-   - User support email: your email
-   - Developer contact email: your email
-4. Add scopes:
-   - Click "Add or Remove Scopes"
-   - Add `https://www.googleapis.com/auth/drive.readonly` (View files in your Google Drive)
-5. Add test users (if in testing mode):
-   - Add your email address and any other users who need access
-6. Save and continue
+The application uses:
+- `https://www.googleapis.com/auth/drive.file` - Read and modify files that this app has accessed
 
-### Step 3: Create OAuth 2.0 Credentials
+**Note:** The app only modifies files you explicitly choose to rename. It cannot access or modify other files.
 
-1. Go to "APIs & Services" > "Credentials"
-2. Click "Create Credentials" > "OAuth client ID"
-3. Choose "Web application"
-4. Configure the application:
-   - **Name:** "Google Drive Analyzer Web Client"
-   - **Authorized JavaScript origins:**
-     - `https://bulk-tools.github.io` (for GitHub Pages)
-     - `http://localhost:5173` (for local development)
-   - **Authorized redirect URIs:** Leave empty (not needed for this implementation)
-5. Click "Create"
-6. Copy the **Client ID** that appears
+## 📖 How to Use
 
-### Step 4: Update the Application
+### Analyzing Your Drive
 
-1. Open `src/lib/constants.js`
-2. Replace the `CLIENT_ID` with your Client ID:
-   ```javascript
-   export const GOOGLE_CONFIG = {
-     CLIENT_ID: 'YOUR-CLIENT-ID.apps.googleusercontent.com',
-     // ... rest of config
-   };
-   ```
+1. Click **"Log In to Drive"** and authorize the application
+2. Click **"Analyze Drive"** to scan all your files
+3. Explore the tree structure:
+   - Click arrows to expand/collapse folders
+   - Use "Expand All" / "Collapse All" for quick navigation
+   - Export to PDF or TXT using the toolbar buttons
 
-## 🛠️ Development
+### Bulk Renaming Files
 
-### Available Scripts
+1. After analyzing your Drive, scroll to the **"Bulk Rename Files"** section
+2. Enter a prefix to search for (default: "Copy of")
+3. Click **"Search Files"** to find matching files
+4. Review the search results:
+   - Current name and new name preview shown for each file
+   - Uncheck files you don't want to rename
+   - Use "Select All" to quickly select/deselect all files
+5. Click **"Preview Changes"** to see a summary (optional)
+6. Click **"Remove Prefix from Selected"** to rename files
+7. Confirm the operation
+8. Wait for completion - the Drive tree will auto-refresh
 
-```bash
-npm run dev      # Start development server
-npm run build    # Build for production
-npm run preview  # Preview production build
-npm run lint     # Lint code
-```
+### Example Use Case
 
-### Project Structure
+If you have many files named:
+- "Copy of Report.pdf"
+- "Copy of Image.jpg"
+- "Copy of Document.docx"
 
-```
-src/
-├── components/
-│   ├── ui/              # shadcn/ui components
-│   ├── Dashboard.jsx    # Main dashboard
-│   ├── LoginPage.jsx
-│   └── StorageOverview.jsx
-├── contexts/
-│   └── AuthContext.jsx  # OAuth context
-├── lib/
-│   ├── constants.js     # Configuration
-│   ├── googleDriveService.js
-│   └── utils.js
-├── App.jsx
-└── main.jsx
-```
+The bulk rename feature will:
+1. Find all files starting with "Copy of"
+2. Show you a preview: "Copy of Report.pdf" → "Report.pdf"
+3. Let you select which ones to rename
+4. Rename them all at once
 
 ## 🔒 Security & Privacy
 
-- **Read-only access**: Only `drive.readonly` scope
-- **No data storage**: All processing in-browser
-- **No external servers**: Data never leaves your machine
-- **Open source**: Full transparency
+- **Minimal permissions**: Only requests access to files it needs to modify
+- **No data storage**: All processing happens in your browser
+- **No external servers**: Your data never leaves your machine
+- **Open source**: Full transparency - inspect the code yourself
+- **Client-side only**: Pure JavaScript, no backend required
 
-## 📦 Deployment
+## 🛠️ Technical Details
 
-### GitHub Pages
+### Built With
+- Vanilla JavaScript (ES6+)
+- Google Drive API v3
+- Google Identity Services
+- Material Icons
+- html2pdf.js for exports
 
-1. **Enable GitHub Pages**: Settings > Pages > Source: GitHub Actions
-2. **Push to main**: The workflow auto-deploys
-3. **Update OAuth**: Add your GitHub Pages URL to authorized origins
+### Browser Compatibility
+- Chrome/Edge (recommended)
+- Firefox
+- Safari
+- Any modern browser with ES6 support
 
 ## 🐛 Troubleshooting
 
 ### "Error 400: redirect_uri_mismatch"
-Add your domain to **Authorized JavaScript origins** in Google Cloud Console.
+Your domain is not in the authorized JavaScript origins list. Add it in Google Cloud Console.
 
 ### "This app isn't verified"
-Normal for testing mode. Click **Advanced** > **Go to [App Name] (unsafe)**.
+Normal for apps in testing mode. Click **Advanced** > **Go to [App Name] (unsafe)**.
 
-### Files not loading
-- Check browser console for errors
-- Verify Google Drive API is enabled
-- Confirm OAuth credentials are correct
+### Files not appearing in search
+- Ensure you've run "Analyze Drive" first
+- The search is case-sensitive and looks for files starting with the prefix
+- Try refreshing by running "Analyze Drive" again
 
-## 🗺️ Roadmap
+### Rename operation failed
+- Check browser console for detailed error messages
+- Ensure you have edit permissions for the files
+- Files in shared drives may have restrictions
 
-**Phase 1 - Foundation** ✅
-- [x] React + Vite + Tailwind setup
-- [x] Google OAuth integration
-- [x] Storage Overview dashboard
-- [x] Loading states and animations
+## 📋 Features Roadmap
 
-**Phase 2 - Visualizations** (In Progress)
-- [ ] File Type Breakdown chart
-- [ ] Treemap visualization
-- [ ] Virtualized file tree
-- [ ] Data grid with sorting
+- [x] Drive tree visualization
+- [x] PDF/TXT export
+- [x] Bulk rename with prefix search
+- [x] Preview before rename
+- [x] Selective file renaming
+- [ ] Support for suffix removal
+- [ ] Find and replace in file names
+- [ ] Regular expression support
+- [ ] Undo rename operation
+- [ ] Batch move/copy operations
+- [ ] File deduplication detection
 
-**Phase 3 - Advanced Features**
-- [ ] PDF/CSV/JSON export
-- [ ] Insights panel
-- [ ] Search and filtering
-- [ ] Dark mode
+## 🤝 Contributing
 
-## 🙏 Acknowledgments
+Contributions welcome! Feel free to:
+- Report bugs
+- Suggest features
+- Submit pull requests
 
-- [shadcn/ui](https://ui.shadcn.com/) - UI components
-- [Recharts](https://recharts.org/) - Data visualization
-- [Framer Motion](https://www.framer.com/motion/) - Animations
-- [Tailwind CSS](https://tailwindcss.com/) - Styling
+## 📄 License
+
+MIT License - feel free to use this for any purpose.
 
 ---
 
