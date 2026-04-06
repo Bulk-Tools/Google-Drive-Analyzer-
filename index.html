@@ -154,7 +154,7 @@
 
         window.onload = () => {
             tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: CLIENT_ID, scope: 'https://www.googleapis.com/auth/drive.file',
+                client_id: CLIENT_ID, scope: 'https://www.googleapis.com/auth/drive',
                 callback: (resp) => {
                     if (resp.error) return;
                     document.getElementById('auth-section').style.display = 'none';
@@ -460,9 +460,11 @@
                     } catch (err) {
                         failed++;
                         status = 'error';
-                        displayMessage = `✗ Failed: "${file.name}" - ${err.message}`;
-                        errors.push(`${file.name}: ${err.message}`);
-                        processedFiles.push({ name: file.name, status, message: displayMessage, error: err.message });
+                        // Extract error message from various possible error structures
+                        const errorMsg = err.result?.error?.message || err.message || JSON.stringify(err);
+                        displayMessage = `✗ Failed: "${file.name}" - ${errorMsg}`;
+                        errors.push(`${file.name}: ${errorMsg}`);
+                        processedFiles.push({ name: file.name, status, message: displayMessage, error: errorMsg });
                     }
                 }
 
