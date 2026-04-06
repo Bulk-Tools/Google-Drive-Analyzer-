@@ -38,6 +38,19 @@
         #status { font-weight: 500; color: var(--primary); margin-bottom: 15px; }
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* Bulk Rename Styles */
+        .search-box { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; }
+        .search-box input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; }
+        .results-container { max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 15px; }
+        .result-item { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #f0f0f0; }
+        .result-item:hover { background: #f8f9fa; }
+        .result-checkbox { margin-right: 10px; }
+        .result-name { flex: 1; font-size: 14px; }
+        .result-new-name { color: var(--primary); font-weight: 500; }
+        .result-icon { margin-right: 8px; font-size: 20px; color: var(--muted); }
+        .bulk-actions { display: flex; gap: 10px; margin-top: 10px; }
+        .stats { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
     </style>
 </head>
 <body>
@@ -51,7 +64,7 @@
     <div class="card" id="data-section" style="display: none;">
         <button onclick="fetchDriveFiles()"><span class="material-icons">sync</span> Analyze Drive</button>
         <div id="status" style="margin-top: 15px;"></div>
-        
+
         <div id="tools" style="display: none;">
             <div class="toolbar">
                 <button class="secondary" onclick="toggleAll('block')"><span class="material-icons">unfold_more</span> Expand All</button>
@@ -64,12 +77,39 @@
         </div>
     </div>
 
+    <div class="card" id="rename-section" style="display: none;">
+        <h3 style="color: var(--primary); margin-top: 0;"><span class="material-icons" style="vertical-align: middle;">drive_file_rename_outline</span> Bulk Rename Files</h3>
+
+        <div class="search-box">
+            <input type="text" id="search-prefix" placeholder='Enter prefix to search (e.g., "Copy of")' value="Copy of">
+            <button onclick="searchFilesWithPrefix()"><span class="material-icons">search</span> Search Files</button>
+        </div>
+
+        <div id="rename-status"></div>
+
+        <div id="results-section" style="display: none;">
+            <div class="stats">
+                <span id="results-count">0 files found</span>
+                <label style="margin-left: 20px;">
+                    <input type="checkbox" id="select-all" onchange="toggleSelectAll(this)"> Select All
+                </label>
+            </div>
+
+            <div class="results-container" id="results-list"></div>
+
+            <div class="bulk-actions">
+                <button onclick="removePrefix()"><span class="material-icons">edit</span> Remove Prefix from Selected</button>
+                <button class="secondary" onclick="previewRename()"><span class="material-icons">visibility</span> Preview Changes</button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client"></script>
     
     <script>
-        const CLIENT_ID = '1082194279992-76lg6issm569spcojof6n1ei0g60qnij.apps.googleusercontent.com'; 
-        let tokenClient, treeData = null;
+        const CLIENT_ID = '1082194279992-76lg6issm569spcojof6n1ei0g60qnij.apps.googleusercontent.com';
+        let tokenClient, treeData = null, allFiles = [];
 
         // --- AUTHENTICATION ---
         gapi.load('client', async () => {
@@ -79,7 +119,7 @@
 
         window.onload = () => {
             tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: CLIENT_ID, scope: 'https://www.googleapis.com/auth/drive.readonly',
+                client_id: CLIENT_ID, scope: 'https://www.googleapis.com/auth/drive.file',
                 callback: (resp) => {
                     if (resp.error) return;
                     document.getElementById('auth-section').style.display = 'none';
@@ -110,10 +150,12 @@
                     pageToken = res.result.nextPageToken;
                 } while (pageToken);
 
+                allFiles = files; // Store for bulk rename
                 status.innerHTML = `<span class="material-icons">check_circle</span> Mapped ${files.length} items.`;
                 treeData = buildTree(files);
                 renderTree(treeData, document.getElementById('tree-container'));
                 document.getElementById('tools').style.display = 'block';
+                document.getElementById('rename-section').style.display = 'block'; // Show rename section
             } catch (err) { status.innerText = `Error: ${err.message}`; }
         }
 
@@ -204,6 +246,158 @@
             }
             const blob = new Blob([txt + buildTxt(node)], { type: 'text/plain' });
             const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'Drive_Tree.txt'; link.click();
+        }
+
+        // --- BULK RENAME FUNCTIONS ---
+        let searchResults = [];
+
+        function searchFilesWithPrefix() {
+            const prefix = document.getElementById('search-prefix').value.trim();
+            const statusEl = document.getElementById('rename-status');
+
+            if (!prefix) {
+                statusEl.innerHTML = '<span style="color: #d93025;">Please enter a prefix to search</span>';
+                return;
+            }
+
+            if (!allFiles.length) {
+                statusEl.innerHTML = '<span style="color: #d93025;">Please analyze your Drive first</span>';
+                return;
+            }
+
+            statusEl.innerHTML = '<span class="material-icons spin">search</span> Searching...';
+
+            // Search for files starting with the prefix
+            searchResults = allFiles.filter(file => file.name.startsWith(prefix));
+
+            if (searchResults.length === 0) {
+                statusEl.innerHTML = `<span style="color: var(--muted);">No files found starting with "${prefix}"</span>`;
+                document.getElementById('results-section').style.display = 'none';
+                return;
+            }
+
+            // Display results
+            displaySearchResults(prefix);
+            statusEl.innerHTML = '';
+            document.getElementById('results-section').style.display = 'block';
+        }
+
+        function displaySearchResults(prefix) {
+            const resultsContainer = document.getElementById('results-list');
+            const countEl = document.getElementById('results-count');
+
+            countEl.textContent = `${searchResults.length} file(s) found`;
+            resultsContainer.innerHTML = '';
+
+            searchResults.forEach((file, index) => {
+                const isFolder = file.mimeType === 'application/vnd.google-apps.folder';
+                const newName = file.name.substring(prefix.length).trim();
+
+                const item = document.createElement('div');
+                item.className = 'result-item';
+                item.innerHTML = `
+                    <input type="checkbox" class="result-checkbox" data-index="${index}" checked>
+                    <span class="material-icons result-icon ${isFolder ? 'folder-icon' : ''}">${isFolder ? 'folder' : 'description'}</span>
+                    <div class="result-name">
+                        <div><strong>Current:</strong> ${file.name}</div>
+                        <div class="result-new-name"><strong>New:</strong> ${newName || '(empty - will skip)'}</div>
+                    </div>
+                `;
+                resultsContainer.appendChild(item);
+            });
+
+            document.getElementById('select-all').checked = true;
+        }
+
+        function toggleSelectAll(checkbox) {
+            document.querySelectorAll('.result-checkbox').forEach(cb => cb.checked = checkbox.checked);
+        }
+
+        function previewRename() {
+            const prefix = document.getElementById('search-prefix').value.trim();
+            const selected = getSelectedFiles();
+
+            if (selected.length === 0) {
+                alert('Please select at least one file to rename');
+                return;
+            }
+
+            let preview = `You are about to rename ${selected.length} file(s):\n\n`;
+            selected.forEach(file => {
+                const newName = file.name.substring(prefix.length).trim();
+                if (newName) {
+                    preview += `"${file.name}" → "${newName}"\n`;
+                }
+            });
+
+            alert(preview);
+        }
+
+        function getSelectedFiles() {
+            const checkboxes = document.querySelectorAll('.result-checkbox:checked');
+            return Array.from(checkboxes).map(cb => searchResults[parseInt(cb.dataset.index)]);
+        }
+
+        async function removePrefix() {
+            const prefix = document.getElementById('search-prefix').value.trim();
+            const selected = getSelectedFiles();
+
+            if (selected.length === 0) {
+                alert('Please select at least one file to rename');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to remove "${prefix}" from ${selected.length} file(s)?`)) {
+                return;
+            }
+
+            const statusEl = document.getElementById('rename-status');
+            statusEl.innerHTML = '<span class="material-icons spin">autorenew</span> Renaming files...';
+
+            let successful = 0, failed = 0, skipped = 0;
+            const errors = [];
+
+            for (let i = 0; i < selected.length; i++) {
+                const file = selected[i];
+                const newName = file.name.substring(prefix.length).trim();
+
+                if (!newName) {
+                    skipped++;
+                    continue; // Skip files that would have empty names
+                }
+
+                try {
+                    await gapi.client.drive.files.update({
+                        fileId: file.id,
+                        resource: { name: newName }
+                    });
+                    successful++;
+                    statusEl.innerHTML = `<span class="material-icons spin">autorenew</span> Renaming... (${i + 1}/${selected.length})`;
+                } catch (err) {
+                    failed++;
+                    errors.push(`${file.name}: ${err.message}`);
+                }
+            }
+
+            // Show results
+            let resultMsg = `<span class="material-icons" style="color: #34a853;">check_circle</span> `;
+            resultMsg += `Renamed ${successful} file(s)`;
+            if (skipped > 0) resultMsg += `, skipped ${skipped} (would be empty)`;
+            if (failed > 0) resultMsg += `, failed ${failed}`;
+
+            statusEl.innerHTML = resultMsg;
+
+            if (errors.length > 0) {
+                console.error('Rename errors:', errors);
+            }
+
+            // Refresh the drive to reflect changes
+            if (successful > 0) {
+                setTimeout(() => {
+                    statusEl.innerHTML += '<br><span style="color: var(--muted); font-size: 13px;">Refreshing Drive data...</span>';
+                    fetchDriveFiles();
+                }, 2000);
+            }
         }
     </script>
 </body>
