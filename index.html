@@ -34,6 +34,27 @@
         .tree-node-content:hover .actions { display: flex; }
         .action-btn { font-size: 16px; color: var(--primary); padding: 4px; border-radius: 50%; }
         .action-btn:hover { background: #d2e3fc; }
+
+        /* Selection Checkbox */
+        .tree-checkbox { margin-right: 8px; cursor: pointer; width: 16px; height: 16px; }
+
+        /* Navigate Mode */
+        .navigate-mode { background: #f8f9fa; border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 15px; display: none; }
+        .breadcrumb { display: flex; align-items: center; gap: 5px; margin-bottom: 15px; flex-wrap: wrap; }
+        .breadcrumb-item { color: var(--primary); cursor: pointer; font-size: 14px; padding: 4px 8px; border-radius: 4px; }
+        .breadcrumb-item:hover { background: #e8f0fe; }
+        .breadcrumb-sep { color: var(--muted); font-size: 12px; }
+        .navigate-container { background: white; padding: 15px; border-radius: 5px; min-height: 200px; }
+        .navigate-item { display: flex; align-items: center; padding: 10px; border-radius: 4px; cursor: pointer; border-bottom: 1px solid #f0f0f0; }
+        .navigate-item:hover { background: #e8f0fe; }
+
+        /* Move To Modal */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; display: none; }
+        .modal-container { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 25px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); z-index: 1000; min-width: 600px; max-width: 800px; max-height: 80vh; overflow-y: auto; display: none; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; }
+        .modal-title { font-size: 20px; font-weight: 600; color: var(--text); }
+        .modal-close { cursor: pointer; font-size: 24px; color: var(--muted); }
+        .modal-close:hover { color: var(--text); }
         
         #status { font-weight: 500; color: var(--primary); margin-bottom: 15px; }
         .spin { animation: spin 1s linear infinite; }
@@ -172,13 +193,47 @@
 
         <div id="tools" style="display: none;">
             <div class="toolbar">
-                <button class="secondary" onclick="toggleAll('block')"><span class="material-icons">unfold_more</span> Expand All</button>
-                <button class="secondary" onclick="toggleAll('none')"><span class="material-icons">unfold_less</span> Collapse All</button>
+                <button class="secondary" onclick="switchToTreeMode()"><span class="material-icons">account_tree</span> Tree View</button>
+                <button class="secondary" onclick="switchToNavigateMode()"><span class="material-icons">folder_open</span> Navigate Mode</button>
+                <button class="secondary" id="expand-all-btn" onclick="toggleAll('block')"><span class="material-icons">unfold_more</span> Expand All</button>
+                <button class="secondary" id="collapse-all-btn" onclick="toggleAll('none')"><span class="material-icons">unfold_less</span> Collapse All</button>
                 <div style="flex-grow: 1;"></div>
+                <button id="move-selected-btn" onclick="openMoveToModal()" style="display: none;"><span class="material-icons">drive_file_move</span> Move Selected (<span id="selected-count">0</span>)</button>
                 <button onclick="exportToPDF('tree-container', 'Full_Drive_Tree')"><span class="material-icons">picture_as_pdf</span> Export PDF</button>
                 <button onclick="exportToTXT(treeData, 'Full_Drive_Tree')"><span class="material-icons">description</span> Export TXT</button>
             </div>
+
+            <!-- Navigate Mode Section -->
+            <div class="navigate-mode" id="navigate-mode">
+                <div class="breadcrumb" id="breadcrumb"></div>
+                <div class="navigate-container" id="navigate-container"></div>
+            </div>
+
+            <!-- Tree View Section -->
             <div id="tree-container"></div>
+        </div>
+    </div>
+
+    <!-- Move To Modal -->
+    <div class="modal-overlay" id="move-modal-overlay" onclick="closeMoveToModal()"></div>
+    <div class="modal-container" id="move-modal-container">
+        <div class="modal-header">
+            <div class="modal-title">
+                <span class="material-icons" style="vertical-align: middle;">drive_file_move</span>
+                Move <span id="modal-selected-count">0</span> item(s)
+            </div>
+            <span class="material-icons modal-close" onclick="closeMoveToModal()">close</span>
+        </div>
+        <div style="margin-bottom: 15px;">
+            <div style="font-size: 14px; color: var(--muted); margin-bottom: 10px;">
+                Navigate to the destination folder:
+            </div>
+            <div class="breadcrumb" id="modal-breadcrumb"></div>
+        </div>
+        <div class="navigate-container" id="modal-navigate-container" style="max-height: 400px; overflow-y: auto;"></div>
+        <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid #e0e0e0; padding-top: 15px;">
+            <button class="secondary" onclick="closeMoveToModal()">Cancel</button>
+            <button onclick="confirmMoveToCurrentFolder()"><span class="material-icons">drive_file_move</span> Move Here</button>
         </div>
     </div>
 
@@ -188,6 +243,10 @@
     <script>
         const CLIENT_ID = '1082194279992-76lg6issm569spcojof6n1ei0g60qnij.apps.googleusercontent.com';
         let tokenClient, treeData = null, allFiles = [];
+        let currentViewMode = 'tree'; // 'tree' or 'navigate'
+        let currentNavigatePath = []; // Array of node IDs for breadcrumb
+        let selectedItems = new Set(); // Set of selected file/folder IDs
+        let modalNavigatePath = []; // For modal navigation
 
         // --- AUTHENTICATION ---
         gapi.load('client', async () => {
@@ -266,8 +325,9 @@
         function renderTree(node, container, isRoot = true) {
             const isFolder = node.mimeType === 'application/vnd.google-apps.folder';
             let li = document.createElement('li');
-            
+
             let content = `<div class="tree-node-content">
+                <input type="checkbox" class="tree-checkbox" data-id="${node.id}" onchange="handleCheckboxChange(this)" ${selectedItems.has(node.id) ? 'checked' : ''}>
                 <span class="material-icons toggle-icon icon" onclick="toggleNode(event, this)">${isFolder && node.children.length ? 'arrow_right' : ''}</span>
                 <span class="material-icons icon ${isFolder ? 'folder-icon' : (node.mimeType.includes('pdf') ? 'pdf-icon' : '')}">${isFolder ? 'folder' : 'description'}</span>
                 <span class="name ${isFolder ? 'folder-name' : ''}">${node.name}</span>
@@ -286,7 +346,7 @@
                 let ul = document.createElement('ul');
                 ul.className = 'tree-children';
                 if (isRoot) ul.style.display = 'block';
-                
+
                 node.children.sort((a,b) => (b.mimeType.includes('folder') ? 1 : 0) - (a.mimeType.includes('folder') ? 1 : 0) || a.name.localeCompare(b.name))
                              .forEach(child => ul.appendChild(renderTree(child, null, false)));
                 li.appendChild(ul);
@@ -662,6 +722,278 @@
                 console.error('TXT export error:', error);
                 updateExportProgress(100, 'Error generating TXT file. Please try again.');
                 setTimeout(hideExportProgress, 2000);
+            }
+        }
+
+        // --- NAVIGATION & SELECTION ---
+
+        // Handle checkbox changes
+        function handleCheckboxChange(checkbox) {
+            const id = checkbox.dataset.id;
+            if (checkbox.checked) {
+                selectedItems.add(id);
+            } else {
+                selectedItems.delete(id);
+            }
+            updateSelectionUI();
+        }
+
+        // Update the selection UI counter and button visibility
+        function updateSelectionUI() {
+            const count = selectedItems.size;
+            document.getElementById('selected-count').textContent = count;
+            document.getElementById('move-selected-btn').style.display = count > 0 ? 'inline-flex' : 'none';
+        }
+
+        // Switch to tree view mode
+        function switchToTreeMode() {
+            currentViewMode = 'tree';
+            document.getElementById('tree-container').style.display = 'block';
+            document.getElementById('navigate-mode').style.display = 'none';
+            document.getElementById('expand-all-btn').style.display = 'inline-flex';
+            document.getElementById('collapse-all-btn').style.display = 'inline-flex';
+        }
+
+        // Switch to navigate mode
+        function switchToNavigateMode() {
+            currentViewMode = 'navigate';
+            document.getElementById('tree-container').style.display = 'none';
+            document.getElementById('navigate-mode').style.display = 'block';
+            document.getElementById('expand-all-btn').style.display = 'none';
+            document.getElementById('collapse-all-btn').style.display = 'none';
+            currentNavigatePath = [];
+            renderNavigateView();
+        }
+
+        // Find a node by ID in the tree
+        function findNodeById(node, id) {
+            if (node.id === id) return node;
+            if (node.children) {
+                for (let child of node.children) {
+                    const found = findNodeById(child, id);
+                    if (found) return found;
+                }
+            }
+            return null;
+        }
+
+        // Get the current node in navigate mode
+        function getCurrentNavigateNode() {
+            if (currentNavigatePath.length === 0) return treeData;
+            const lastId = currentNavigatePath[currentNavigatePath.length - 1];
+            return findNodeById(treeData, lastId);
+        }
+
+        // Render the navigate view
+        function renderNavigateView() {
+            const currentNode = getCurrentNavigateNode();
+            renderBreadcrumb(currentNavigatePath, 'breadcrumb');
+            renderNavigateContainer(currentNode, 'navigate-container');
+        }
+
+        // Render breadcrumb navigation
+        function renderBreadcrumb(path, containerId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+
+            // Add "My Drive" root
+            const rootCrumb = document.createElement('span');
+            rootCrumb.className = 'breadcrumb-item';
+            rootCrumb.innerHTML = '<span class="material-icons" style="font-size: 18px; vertical-align: middle;">home</span> My Drive';
+            rootCrumb.onclick = () => {
+                if (containerId === 'breadcrumb') {
+                    currentNavigatePath = [];
+                    renderNavigateView();
+                } else {
+                    modalNavigatePath = [];
+                    renderModalNavigateView();
+                }
+            };
+            container.appendChild(rootCrumb);
+
+            // Add path items
+            path.forEach((nodeId, index) => {
+                const sep = document.createElement('span');
+                sep.className = 'breadcrumb-sep';
+                sep.textContent = '›';
+                container.appendChild(sep);
+
+                const node = findNodeById(treeData, nodeId);
+                if (node) {
+                    const crumb = document.createElement('span');
+                    crumb.className = 'breadcrumb-item';
+                    crumb.textContent = node.name;
+                    crumb.onclick = () => {
+                        if (containerId === 'breadcrumb') {
+                            currentNavigatePath = path.slice(0, index + 1);
+                            renderNavigateView();
+                        } else {
+                            modalNavigatePath = path.slice(0, index + 1);
+                            renderModalNavigateView();
+                        }
+                    };
+                    container.appendChild(crumb);
+                }
+            });
+        }
+
+        // Render the navigate container with folders and files
+        function renderNavigateContainer(node, containerId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+
+            if (!node.children || node.children.length === 0) {
+                container.innerHTML = '<div style="text-align: center; color: var(--muted); padding: 40px;">This folder is empty</div>';
+                return;
+            }
+
+            // Sort: folders first, then files
+            const sorted = [...node.children].sort((a, b) => {
+                const aIsFolder = a.mimeType === 'application/vnd.google-apps.folder';
+                const bIsFolder = b.mimeType === 'application/vnd.google-apps.folder';
+                if (aIsFolder !== bIsFolder) return bIsFolder ? 1 : -1;
+                return a.name.localeCompare(b.name);
+            });
+
+            sorted.forEach(item => {
+                const isFolder = item.mimeType === 'application/vnd.google-apps.folder';
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'navigate-item';
+
+                const isModal = containerId === 'modal-navigate-container';
+
+                itemDiv.innerHTML = `
+                    ${!isModal ? `<input type="checkbox" class="tree-checkbox" data-id="${item.id}" onchange="handleCheckboxChange(this)" ${selectedItems.has(item.id) ? 'checked' : ''}>` : ''}
+                    <span class="material-icons icon ${isFolder ? 'folder-icon' : ''}" style="margin-right: 8px;">${isFolder ? 'folder' : 'description'}</span>
+                    <span class="name" style="flex: 1;">${item.name}</span>
+                    ${item.size && !isFolder ? `<span class="size">${(item.size/1024/1024).toFixed(2)} MB</span>` : ''}
+                `;
+
+                if (isFolder) {
+                    itemDiv.onclick = (e) => {
+                        // Don't navigate if clicking checkbox
+                        if (e.target.type === 'checkbox') return;
+
+                        if (containerId === 'navigate-container') {
+                            currentNavigatePath.push(item.id);
+                            renderNavigateView();
+                        } else {
+                            modalNavigatePath.push(item.id);
+                            renderModalNavigateView();
+                        }
+                    };
+                }
+
+                container.appendChild(itemDiv);
+            });
+        }
+
+        // Open the move-to modal
+        function openMoveToModal() {
+            if (selectedItems.size === 0) {
+                alert('Please select at least one item to move');
+                return;
+            }
+
+            modalNavigatePath = [];
+            document.getElementById('modal-selected-count').textContent = selectedItems.size;
+            document.getElementById('move-modal-overlay').style.display = 'block';
+            document.getElementById('move-modal-container').style.display = 'block';
+            renderModalNavigateView();
+        }
+
+        // Close the move-to modal
+        function closeMoveToModal() {
+            document.getElementById('move-modal-overlay').style.display = 'none';
+            document.getElementById('move-modal-container').style.display = 'none';
+        }
+
+        // Render modal navigation view
+        function renderModalNavigateView() {
+            const currentNode = modalNavigatePath.length === 0 ? treeData : findNodeById(treeData, modalNavigatePath[modalNavigatePath.length - 1]);
+            renderBreadcrumb(modalNavigatePath, 'modal-breadcrumb');
+            renderNavigateContainer(currentNode, 'modal-navigate-container');
+        }
+
+        // Confirm move to current folder in modal
+        async function confirmMoveToCurrentFolder() {
+            const destinationNode = modalNavigatePath.length === 0 ? treeData : findNodeById(treeData, modalNavigatePath[modalNavigatePath.length - 1]);
+            const destinationId = destinationNode.id === 'root' ? 'root' : destinationNode.id;
+            const destinationName = destinationNode.name;
+
+            if (!confirm(`Move ${selectedItems.size} item(s) to "${destinationName}"?`)) {
+                return;
+            }
+
+            closeMoveToModal();
+
+            // Show status
+            const statusEl = document.getElementById('status');
+            statusEl.innerHTML = '<span class="material-icons spin">autorenew</span> Moving items...';
+
+            let successful = 0, failed = 0, skipped = 0;
+            const errors = [];
+
+            for (const itemId of selectedItems) {
+                const file = allFiles.find(f => f.id === itemId);
+                if (!file) continue;
+
+                // Skip if already in destination
+                const isAtRoot = !file.parents || file.parents.length === 0;
+                if (destinationId === 'root' && isAtRoot) {
+                    skipped++;
+                    continue;
+                }
+                if (file.parents && file.parents.includes(destinationId)) {
+                    skipped++;
+                    continue;
+                }
+
+                // Don't allow moving a folder into itself
+                if (file.id === destinationId) {
+                    skipped++;
+                    continue;
+                }
+
+                try {
+                    const previousParents = file.parents ? file.parents.join(',') : '';
+                    const updateParams = {
+                        fileId: file.id,
+                        addParents: destinationId,
+                        fields: 'id, parents'
+                    };
+                    if (previousParents) {
+                        updateParams.removeParents = previousParents;
+                    }
+                    await gapi.client.drive.files.update(updateParams);
+                    successful++;
+                } catch (err) {
+                    failed++;
+                    const errorMsg = err.result?.error?.message || err.message || JSON.stringify(err);
+                    errors.push(`${file.name}: ${errorMsg}`);
+                }
+            }
+
+            // Update status
+            let resultMsg = `<span class="material-icons" style="color: #34a853;">check_circle</span> Moved ${successful} item(s)`;
+            if (skipped > 0) resultMsg += `, skipped ${skipped}`;
+            if (failed > 0) resultMsg += `, <span style="color: #d93025;">failed ${failed}</span>`;
+            statusEl.innerHTML = resultMsg;
+
+            if (errors.length > 0) {
+                console.error('Move errors:', errors);
+            }
+
+            // Clear selection
+            selectedItems.clear();
+            updateSelectionUI();
+
+            // Refresh the drive to reflect changes
+            if (successful > 0) {
+                setTimeout(() => {
+                    statusEl.innerHTML += '<br><span style="color: var(--muted); font-size: 13px;">Refreshing Drive data...</span>';
+                    fetchDriveFiles();
+                }, 2000);
             }
         }
 
