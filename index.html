@@ -197,6 +197,8 @@
                 <button class="secondary" onclick="switchToNavigateMode()"><span class="material-icons">folder_open</span> Navigate Mode</button>
                 <button class="secondary" id="expand-all-btn" onclick="toggleAll('block')"><span class="material-icons">unfold_more</span> Expand All</button>
                 <button class="secondary" id="collapse-all-btn" onclick="toggleAll('none')"><span class="material-icons">unfold_less</span> Collapse All</button>
+                <button class="secondary" id="select-all-btn" onclick="selectAllItems()"><span class="material-icons">check_box</span> Select All</button>
+                <button class="secondary" id="deselect-all-btn" onclick="deselectAllItems()" style="display: none;"><span class="material-icons">check_box_outline_blank</span> Deselect All</button>
                 <div style="flex-grow: 1;"></div>
                 <button id="move-selected-btn" onclick="openMoveToModal()" style="display: none;"><span class="material-icons">drive_file_move</span> Move Selected (<span id="selected-count">0</span>)</button>
                 <button onclick="exportToPDF('tree-container', 'Full_Drive_Tree')"><span class="material-icons">picture_as_pdf</span> Export PDF</button>
@@ -743,6 +745,54 @@
             const count = selectedItems.size;
             document.getElementById('selected-count').textContent = count;
             document.getElementById('move-selected-btn').style.display = count > 0 ? 'inline-flex' : 'none';
+
+            // Toggle Select All / Deselect All button visibility
+            if (count > 0) {
+                document.getElementById('select-all-btn').style.display = 'none';
+                document.getElementById('deselect-all-btn').style.display = 'inline-flex';
+            } else {
+                document.getElementById('select-all-btn').style.display = 'inline-flex';
+                document.getElementById('deselect-all-btn').style.display = 'none';
+            }
+        }
+
+        // Select all items in the tree
+        function selectAllItems() {
+            // Collect all file/folder IDs from the tree
+            function collectAllIds(node) {
+                const ids = [];
+                if (node.id && node.id !== 'root') {
+                    ids.push(node.id);
+                }
+                if (node.children) {
+                    node.children.forEach(child => {
+                        ids.push(...collectAllIds(child));
+                    });
+                }
+                return ids;
+            }
+
+            const allIds = collectAllIds(treeData);
+            selectedItems = new Set(allIds);
+
+            // Update all checkboxes
+            document.querySelectorAll('.tree-checkbox').forEach(checkbox => {
+                checkbox.checked = true;
+            });
+
+            updateSelectionUI();
+        }
+
+        // Deselect all items
+        function deselectAllItems() {
+            selectedItems.clear();
+
+            // Update all checkboxes
+            document.querySelectorAll('.tree-checkbox').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+
+            updateSelectionUI();
         }
 
         // Switch to tree view mode
@@ -752,6 +802,8 @@
             document.getElementById('navigate-mode').style.display = 'none';
             document.getElementById('expand-all-btn').style.display = 'inline-flex';
             document.getElementById('collapse-all-btn').style.display = 'inline-flex';
+            document.getElementById('select-all-btn').style.display = selectedItems.size > 0 ? 'none' : 'inline-flex';
+            document.getElementById('deselect-all-btn').style.display = selectedItems.size > 0 ? 'inline-flex' : 'none';
         }
 
         // Switch to navigate mode
@@ -761,6 +813,8 @@
             document.getElementById('navigate-mode').style.display = 'block';
             document.getElementById('expand-all-btn').style.display = 'none';
             document.getElementById('collapse-all-btn').style.display = 'none';
+            document.getElementById('select-all-btn').style.display = selectedItems.size > 0 ? 'none' : 'inline-flex';
+            document.getElementById('deselect-all-btn').style.display = selectedItems.size > 0 ? 'inline-flex' : 'none';
             currentNavigatePath = [];
             renderNavigateView();
         }
