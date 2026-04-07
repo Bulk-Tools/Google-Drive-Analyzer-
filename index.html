@@ -712,9 +712,13 @@
             countEl.textContent = `${moveSearchResults.length} item(s) found`;
             resultsContainer.innerHTML = '';
 
+            // Build lookup map for parent folder names
+            const fileMap = {};
+            allFiles.forEach(f => fileMap[f.id] = f);
+
             moveSearchResults.forEach((file, index) => {
                 const isFolder = file.mimeType === 'application/vnd.google-apps.folder';
-                const parentFolder = file.parents ? allFiles.find(f => f.id === file.parents[0]) : null;
+                const parentFolder = file.parents ? fileMap[file.parents[0]] : null;
                 const locationText = parentFolder ? parentFolder.name : 'My Drive';
 
                 const item = document.createElement('div');
@@ -879,6 +883,10 @@
                 }
 
                 // Skip if already in destination
+                const isAtRoot = !file.parents || file.parents.length === 0;
+                if (selectedDestFolderId === 'root' && isAtRoot) {
+                    return { status: 'skipped', file, message: `⚠️ Skipped: "${file.name}" (already in destination)` };
+                }
                 if (file.parents && file.parents.includes(selectedDestFolderId)) {
                     return { status: 'skipped', file, message: `⚠️ Skipped: "${file.name}" (already in destination)` };
                 }
@@ -890,12 +898,15 @@
 
                 try {
                     const previousParents = file.parents ? file.parents.join(',') : '';
-                    await gapi.client.drive.files.update({
+                    const updateParams = {
                         fileId: file.id,
                         addParents: selectedDestFolderId,
-                        removeParents: previousParents,
                         fields: 'id, parents'
-                    });
+                    };
+                    if (previousParents) {
+                        updateParams.removeParents = previousParents;
+                    }
+                    await gapi.client.drive.files.update(updateParams);
                     return { status: 'success', file, message: `✓ Moved: "${file.name}" → ${selectedDestFolderName}` };
                 } catch (err) {
                     const errorMsg = err.result?.error?.message || err.message || JSON.stringify(err);
