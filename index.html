@@ -39,7 +39,7 @@
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
 
-        /* Bulk Rename Styles */
+        /* Search & Results Styles */
         .search-box { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; }
         .search-box input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; }
         .results-container { max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 15px; }
@@ -47,9 +47,10 @@
         .result-item:hover { background: #f8f9fa; }
         .result-checkbox { margin-right: 10px; }
         .result-name { flex: 1; font-size: 14px; }
-        .result-new-name { color: var(--primary); font-weight: 500; }
         .result-icon { margin-right: 8px; font-size: 20px; color: var(--muted); }
         .bulk-actions { display: flex; gap: 10px; margin-top: 10px; }
+        .dest-folder-item { cursor: pointer; }
+        .dest-folder-item:hover { background: #e8f0fe; }
         .stats { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
 
         /* Progress Bar Styles */
@@ -97,51 +98,70 @@
         <button id="signout_button" onclick="handleSignoutClick()" style="display: none;">Sign Out</button>
     </div>
 
-    <div class="card" id="rename-section" style="display: none;">
-        <h3 style="color: var(--primary); margin-top: 0;"><span class="material-icons" style="vertical-align: middle;">drive_file_rename_outline</span> Bulk Rename Files</h3>
+    <div class="card" id="move-section" style="display: none;">
+        <h3 style="color: var(--primary); margin-top: 0;"><span class="material-icons" style="vertical-align: middle;">drive_file_move</span> Move Files & Folders</h3>
 
         <div class="search-box">
-            <input type="text" id="search-prefix" placeholder='Enter prefix to search (e.g., "Copy of")' value="Copy of">
-            <button onclick="searchFilesWithPrefix()"><span class="material-icons">search</span> Search Files</button>
+            <input type="text" id="move-search" placeholder="Search files or folders to move...">
+            <button onclick="searchFilesToMove()"><span class="material-icons">search</span> Search</button>
         </div>
 
-        <div id="rename-status"></div>
+        <div id="move-status"></div>
 
         <!-- Progress Bar Container -->
-        <div class="progress-container" id="progress-container">
+        <div class="progress-container" id="move-progress-container">
             <div class="progress-header">
-                <span id="progress-text">Processing files...</span>
-                <span id="progress-count">0 / 0</span>
+                <span id="move-progress-text">Moving files...</span>
+                <span id="move-progress-count">0 / 0</span>
             </div>
             <div class="progress-bar-bg">
-                <div class="progress-bar-fill" id="progress-bar-fill" style="width: 0%;">
-                    <span id="progress-percentage">0%</span>
+                <div class="progress-bar-fill" id="move-progress-bar-fill" style="width: 0%;">
+                    <span id="move-progress-percentage">0%</span>
                 </div>
             </div>
             <div style="margin-top: 10px;">
-                <button id="stop-button" onclick="stopRenameProcess()" style="background: #d93025;">
+                <button id="move-stop-button" onclick="stopMoveProcess()" style="background: #d93025;">
                     <span class="material-icons">stop</span> Stop Process
                 </button>
             </div>
-            <div class="processed-files" id="processed-files">
-                <div class="processed-files-title">Processed Files:</div>
-                <div id="processed-files-list"></div>
+            <div class="processed-files" id="move-processed-files">
+                <div class="processed-files-title">Processed Items:</div>
+                <div id="move-processed-files-list"></div>
             </div>
         </div>
 
-        <div id="results-section" style="display: none;">
+        <div id="move-results-section" style="display: none;">
             <div class="stats">
-                <span id="results-count">0 files found</span>
+                <span id="move-results-count">0 items found</span>
                 <label style="margin-left: 20px;">
-                    <input type="checkbox" id="select-all" onchange="toggleSelectAll(this)"> Select All
+                    <input type="checkbox" id="move-select-all" onchange="toggleMoveSelectAll(this)"> Select All
                 </label>
             </div>
 
-            <div class="results-container" id="results-list"></div>
+            <div class="results-container" id="move-results-list"></div>
+
+            <!-- Destination Folder Picker -->
+            <div style="margin-top: 15px; padding: 15px; background: #f0f7ff; border-radius: 8px; border: 1px solid #c6deff;">
+                <h4 style="margin: 0 0 10px 0; color: var(--primary);">
+                    <span class="material-icons" style="vertical-align: middle; font-size: 18px;">folder_open</span>
+                    Select Destination Folder
+                </h4>
+                <div class="search-box" id="dest-folder-search-box" style="margin-bottom: 10px;">
+                    <input type="text" id="dest-folder-search" placeholder="Filter folders..." oninput="filterDestFolders()">
+                </div>
+                <div id="dest-folder-selected" style="margin-bottom: 10px; display: none;">
+                    <span style="font-weight: 500; color: var(--primary);">
+                        <span class="material-icons" style="vertical-align: middle; font-size: 18px;">check_circle</span>
+                        Moving to: <span id="dest-folder-name"></span>
+                    </span>
+                    <button class="secondary" onclick="clearDestFolder()" style="padding: 4px 8px; font-size: 12px; margin-left: 10px;">Change</button>
+                </div>
+                <div class="results-container" id="dest-folder-list" style="max-height: 200px;"></div>
+            </div>
 
             <div class="bulk-actions">
-                <button onclick="removePrefix()"><span class="material-icons">edit</span> Remove Prefix from Selected</button>
-                <button class="secondary" onclick="previewRename()"><span class="material-icons">visibility</span> Preview Changes</button>
+                <button onclick="moveSelectedFiles()"><span class="material-icons">drive_file_move</span> Move Selected</button>
+                <button class="secondary" onclick="previewMove()"><span class="material-icons">visibility</span> Preview Move</button>
             </div>
         </div>
     </div>
@@ -182,7 +202,7 @@
                     if (resp.error) return;
                     document.getElementById('auth-section').style.display = 'none';
                     document.getElementById('data-section').style.display = 'block';
-                    document.getElementById('rename-section').style.display = 'block';
+                    document.getElementById('move-section').style.display = 'block';
                     document.getElementById('signout_button').style.display = 'inline-flex';
                 }
             });
@@ -209,7 +229,7 @@
                     pageToken = res.result.nextPageToken;
                 } while (pageToken);
 
-                allFiles = files; // Store for bulk rename
+                allFiles = files; // Store for move feature
                 status.innerHTML = `<span class="material-icons">check_circle</span> Mapped ${files.length} items.`;
                 treeData = buildTree(files);
                 renderTree(treeData, document.getElementById('tree-container'));
@@ -645,16 +665,18 @@
             }
         }
 
-        // --- BULK RENAME FUNCTIONS ---
-        let searchResults = [];
-        let shouldStopRenaming = false;
+        // --- MOVE FILES FUNCTIONS ---
+        let moveSearchResults = [];
+        let shouldStopMoving = false;
+        let selectedDestFolderId = null;
+        let selectedDestFolderName = null;
 
-        function searchFilesWithPrefix() {
-            const prefix = document.getElementById('search-prefix').value.trim();
-            const statusEl = document.getElementById('rename-status');
+        function searchFilesToMove() {
+            const query = document.getElementById('move-search').value.trim().toLowerCase();
+            const statusEl = document.getElementById('move-status');
 
-            if (!prefix) {
-                statusEl.innerHTML = '<span style="color: #d93025;">Please enter a prefix to search</span>';
+            if (!query) {
+                statusEl.innerHTML = '<span style="color: #d93025;">Please enter a search term</span>';
                 return;
             }
 
@@ -665,31 +687,39 @@
 
             statusEl.innerHTML = '<span class="material-icons spin">search</span> Searching...';
 
-            // Search for files starting with the prefix
-            searchResults = allFiles.filter(file => file.name.startsWith(prefix));
+            // Search for files/folders matching the query
+            moveSearchResults = allFiles.filter(file =>
+                file.name.toLowerCase().includes(query)
+            );
 
-            if (searchResults.length === 0) {
-                statusEl.innerHTML = `<span style="color: var(--muted);">No files found starting with "${prefix}"</span>`;
-                document.getElementById('results-section').style.display = 'none';
+            if (moveSearchResults.length === 0) {
+                statusEl.innerHTML = `<span style="color: var(--muted);">No items found matching "${document.getElementById('move-search').value.trim()}"</span>`;
+                document.getElementById('move-results-section').style.display = 'none';
                 return;
             }
 
             // Display results
-            displaySearchResults(prefix);
+            displayMoveSearchResults();
+            populateDestFolders();
             statusEl.innerHTML = '';
-            document.getElementById('results-section').style.display = 'block';
+            document.getElementById('move-results-section').style.display = 'block';
         }
 
-        function displaySearchResults(prefix) {
-            const resultsContainer = document.getElementById('results-list');
-            const countEl = document.getElementById('results-count');
+        function displayMoveSearchResults() {
+            const resultsContainer = document.getElementById('move-results-list');
+            const countEl = document.getElementById('move-results-count');
 
-            countEl.textContent = `${searchResults.length} file(s) found`;
+            countEl.textContent = `${moveSearchResults.length} item(s) found`;
             resultsContainer.innerHTML = '';
 
-            searchResults.forEach((file, index) => {
+            // Build lookup map for parent folder names
+            const fileMap = {};
+            allFiles.forEach(f => fileMap[f.id] = f);
+
+            moveSearchResults.forEach((file, index) => {
                 const isFolder = file.mimeType === 'application/vnd.google-apps.folder';
-                const newName = file.name.substring(prefix.length).trim();
+                const parentFolder = file.parents ? fileMap[file.parents[0]] : null;
+                const locationText = parentFolder ? parentFolder.name : 'My Drive';
 
                 const item = document.createElement('div');
                 item.className = 'result-item';
@@ -697,79 +727,143 @@
                     <input type="checkbox" class="result-checkbox" data-index="${index}" checked>
                     <span class="material-icons result-icon ${isFolder ? 'folder-icon' : ''}">${isFolder ? 'folder' : 'description'}</span>
                     <div class="result-name">
-                        <div><strong>Current:</strong> ${file.name}</div>
-                        <div class="result-new-name"><strong>New:</strong> ${newName || '(empty - will skip)'}</div>
+                        <div>${file.name}</div>
+                        <div style="font-size: 12px; color: var(--muted);">📍 Location: ${locationText}</div>
                     </div>
                 `;
                 resultsContainer.appendChild(item);
             });
 
-            document.getElementById('select-all').checked = true;
+            document.getElementById('move-select-all').checked = true;
         }
 
-        function toggleSelectAll(checkbox) {
+        function populateDestFolders() {
+            const folders = allFiles.filter(f => f.mimeType === 'application/vnd.google-apps.folder')
+                                    .sort((a, b) => a.name.localeCompare(b.name));
+
+            const container = document.getElementById('dest-folder-list');
+            container.innerHTML = '';
+
+            // Add "My Drive (root)" option
+            const rootItem = document.createElement('div');
+            rootItem.className = 'result-item dest-folder-item';
+            rootItem.setAttribute('data-name', 'my drive');
+            rootItem.innerHTML = `
+                <span class="material-icons result-icon folder-icon">home</span>
+                <div class="result-name">My Drive (root)</div>
+            `;
+            rootItem.onclick = () => selectDestFolder('root', 'My Drive (root)');
+            container.appendChild(rootItem);
+
+            folders.forEach(folder => {
+                const item = document.createElement('div');
+                item.className = 'result-item dest-folder-item';
+                item.setAttribute('data-name', folder.name.toLowerCase());
+                item.innerHTML = `
+                    <span class="material-icons result-icon folder-icon">folder</span>
+                    <div class="result-name">${folder.name}</div>
+                `;
+                item.onclick = () => selectDestFolder(folder.id, folder.name);
+                container.appendChild(item);
+            });
+        }
+
+        function filterDestFolders() {
+            const query = document.getElementById('dest-folder-search').value.trim().toLowerCase();
+            const items = document.querySelectorAll('.dest-folder-item');
+
+            items.forEach(item => {
+                const name = item.getAttribute('data-name');
+                item.style.display = name.includes(query) ? 'flex' : 'none';
+            });
+        }
+
+        function selectDestFolder(folderId, folderName) {
+            selectedDestFolderId = folderId;
+            selectedDestFolderName = folderName;
+            document.getElementById('dest-folder-name').textContent = folderName;
+            document.getElementById('dest-folder-selected').style.display = 'block';
+            document.getElementById('dest-folder-list').style.display = 'none';
+            document.getElementById('dest-folder-search-box').style.display = 'none';
+        }
+
+        function clearDestFolder() {
+            selectedDestFolderId = null;
+            selectedDestFolderName = null;
+            document.getElementById('dest-folder-selected').style.display = 'none';
+            document.getElementById('dest-folder-list').style.display = 'block';
+            document.getElementById('dest-folder-search-box').style.display = 'flex';
+        }
+
+        function toggleMoveSelectAll(checkbox) {
             document.querySelectorAll('.result-checkbox').forEach(cb => cb.checked = checkbox.checked);
         }
 
-        function previewRename() {
-            const prefix = document.getElementById('search-prefix').value.trim();
-            const selected = getSelectedFiles();
+        function getMoveSelectedFiles() {
+            const checkboxes = document.querySelectorAll('.result-checkbox:checked');
+            return Array.from(checkboxes).map(cb => moveSearchResults[parseInt(cb.dataset.index)]);
+        }
+
+        function previewMove() {
+            const selected = getMoveSelectedFiles();
 
             if (selected.length === 0) {
-                alert('Please select at least one file to rename');
+                alert('Please select at least one item to move');
                 return;
             }
 
-            let preview = `You are about to rename ${selected.length} file(s):\n\n`;
+            if (!selectedDestFolderId) {
+                alert('Please select a destination folder');
+                return;
+            }
+
+            let preview = `You are about to move ${selected.length} item(s) to "${selectedDestFolderName}":\n\n`;
             selected.forEach(file => {
-                const newName = file.name.substring(prefix.length).trim();
-                if (newName) {
-                    preview += `"${file.name}" → "${newName}"\n`;
-                }
+                const isFolder = file.mimeType === 'application/vnd.google-apps.folder';
+                preview += `${isFolder ? '📁' : '📄'} ${file.name}\n`;
             });
 
             alert(preview);
         }
 
-        function getSelectedFiles() {
-            const checkboxes = document.querySelectorAll('.result-checkbox:checked');
-            return Array.from(checkboxes).map(cb => searchResults[parseInt(cb.dataset.index)]);
+        function stopMoveProcess() {
+            shouldStopMoving = true;
+            document.getElementById('move-stop-button').disabled = true;
+            document.getElementById('move-stop-button').innerHTML = '<span class="material-icons">stop</span> Stopping...';
         }
 
-        function stopRenameProcess() {
-            shouldStopRenaming = true;
-            document.getElementById('stop-button').disabled = true;
-            document.getElementById('stop-button').innerHTML = '<span class="material-icons">stop</span> Stopping...';
-        }
-
-        async function removePrefix() {
-            const prefix = document.getElementById('search-prefix').value.trim();
-            const selected = getSelectedFiles();
+        async function moveSelectedFiles() {
+            const selected = getMoveSelectedFiles();
 
             if (selected.length === 0) {
-                alert('Please select at least one file to rename');
+                alert('Please select at least one item to move');
                 return;
             }
 
-            if (!confirm(`Are you sure you want to remove "${prefix}" from ${selected.length} file(s)?`)) {
+            if (!selectedDestFolderId) {
+                alert('Please select a destination folder');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to move ${selected.length} item(s) to "${selectedDestFolderName}"?`)) {
                 return;
             }
 
             // Reset stop flag
-            shouldStopRenaming = false;
+            shouldStopMoving = false;
 
-            const statusEl = document.getElementById('rename-status');
-            const progressContainer = document.getElementById('progress-container');
-            const progressBar = document.getElementById('progress-bar-fill');
-            const progressText = document.getElementById('progress-text');
-            const progressCount = document.getElementById('progress-count');
-            const progressPercentage = document.getElementById('progress-percentage');
-            const processedFilesList = document.getElementById('processed-files-list');
-            const stopButton = document.getElementById('stop-button');
+            const statusEl = document.getElementById('move-status');
+            const progressContainer = document.getElementById('move-progress-container');
+            const progressBar = document.getElementById('move-progress-bar-fill');
+            const progressText = document.getElementById('move-progress-text');
+            const progressCount = document.getElementById('move-progress-count');
+            const progressPercentage = document.getElementById('move-progress-percentage');
+            const processedFilesList = document.getElementById('move-processed-files-list');
+            const stopButton = document.getElementById('move-stop-button');
 
             // Show progress bar and hide results section during processing
             progressContainer.style.display = 'block';
-            document.getElementById('results-section').style.display = 'none';
+            document.getElementById('move-results-section').style.display = 'none';
             statusEl.innerHTML = '';
             processedFilesList.innerHTML = '';
             stopButton.disabled = false;
@@ -777,30 +871,43 @@
 
             let successful = 0, failed = 0, skipped = 0;
             const errors = [];
-            const processedFiles = [];
 
-            // Parallel processing with batching for extreme speed
-            const BATCH_SIZE = 50; // Process 50 files concurrently
+            // Parallel processing with batching for speed
+            const BATCH_SIZE = 50;
             let completed = 0;
 
-            // Function to rename a single file
-            async function renameFile(file, index) {
-                if (shouldStopRenaming) {
+            // Function to move a single file
+            async function moveFile(file) {
+                if (shouldStopMoving) {
                     return { status: 'stopped', file };
                 }
 
-                const newName = file.name.substring(prefix.length).trim();
+                // Skip if already in destination
+                const isAtRoot = !file.parents || file.parents.length === 0;
+                if (selectedDestFolderId === 'root' && isAtRoot) {
+                    return { status: 'skipped', file, message: `⚠️ Skipped: "${file.name}" (already in destination)` };
+                }
+                if (file.parents && file.parents.includes(selectedDestFolderId)) {
+                    return { status: 'skipped', file, message: `⚠️ Skipped: "${file.name}" (already in destination)` };
+                }
 
-                if (!newName) {
-                    return { status: 'skipped', file, message: `⚠️ Skipped: "${file.name}" (would result in empty name)` };
+                // Don't allow moving a folder into itself
+                if (file.id === selectedDestFolderId) {
+                    return { status: 'skipped', file, message: `⚠️ Skipped: "${file.name}" (cannot move folder into itself)` };
                 }
 
                 try {
-                    await gapi.client.drive.files.update({
+                    const previousParents = file.parents ? file.parents.join(',') : '';
+                    const updateParams = {
                         fileId: file.id,
-                        resource: { name: newName }
-                    });
-                    return { status: 'success', file, newName, message: `✓ Renamed: "${file.name}" → "${newName}"` };
+                        addParents: selectedDestFolderId,
+                        fields: 'id, parents'
+                    };
+                    if (previousParents) {
+                        updateParams.removeParents = previousParents;
+                    }
+                    await gapi.client.drive.files.update(updateParams);
+                    return { status: 'success', file, message: `✓ Moved: "${file.name}" → ${selectedDestFolderName}` };
                 } catch (err) {
                     const errorMsg = err.result?.error?.message || err.message || JSON.stringify(err);
                     return { status: 'error', file, error: errorMsg, message: `✗ Failed: "${file.name}" - ${errorMsg}` };
@@ -830,17 +937,17 @@
                 fileItem.textContent = result.message;
                 processedFilesList.appendChild(fileItem);
 
-                // Auto-scroll to bottom to show latest processed file
-                document.getElementById('processed-files').scrollTop = document.getElementById('processed-files').scrollHeight;
+                // Auto-scroll to bottom to show latest processed item
+                document.getElementById('move-processed-files').scrollTop = document.getElementById('move-processed-files').scrollHeight;
             }
 
             // Process files in batches for maximum speed
             for (let i = 0; i < selected.length; i += BATCH_SIZE) {
-                if (shouldStopRenaming) {
+                if (shouldStopMoving) {
                     progressText.textContent = 'Process stopped by user';
                     const stopMsg = document.createElement('div');
                     stopMsg.className = 'processed-file-item skipped';
-                    stopMsg.textContent = `⚠️ Process stopped. Remaining ${selected.length - completed} file(s) were not processed.`;
+                    stopMsg.textContent = `⚠️ Process stopped. Remaining ${selected.length - completed} item(s) were not processed.`;
                     processedFilesList.appendChild(stopMsg);
                     break;
                 }
@@ -849,7 +956,7 @@
                 progressText.textContent = `Processing batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(selected.length / BATCH_SIZE)}...`;
 
                 // Process entire batch in parallel
-                const batchPromises = batch.map((file, index) => renameFile(file, i + index));
+                const batchPromises = batch.map(file => moveFile(file));
                 const results = await Promise.all(batchPromises);
 
                 // Update UI with all results from this batch
@@ -861,21 +968,21 @@
             }
 
             // Update final status
-            if (!shouldStopRenaming) {
+            if (!shouldStopMoving) {
                 progressText.textContent = 'Processing complete!';
             }
 
-            let resultMsg = shouldStopRenaming
+            let resultMsg = shouldStopMoving
                 ? `<span class="material-icons" style="color: #f9ab00;">warning</span> Process stopped. `
                 : `<span class="material-icons" style="color: #34a853;">check_circle</span> `;
-            resultMsg += `Renamed ${successful} file(s)`;
-            if (skipped > 0) resultMsg += `, skipped ${skipped} (would be empty)`;
+            resultMsg += `Moved ${successful} item(s)`;
+            if (skipped > 0) resultMsg += `, skipped ${skipped}`;
             if (failed > 0) resultMsg += `, <span style="color: #d93025;">failed ${failed}</span>`;
 
             statusEl.innerHTML = resultMsg;
 
             if (errors.length > 0) {
-                console.error('Rename errors:', errors);
+                console.error('Move errors:', errors);
                 statusEl.innerHTML += '<br><span style="color: var(--muted); font-size: 12px;">Check console for detailed error messages</span>';
             }
 
@@ -884,7 +991,7 @@
 
             // Show results section again after a brief delay
             setTimeout(() => {
-                document.getElementById('results-section').style.display = 'block';
+                document.getElementById('move-results-section').style.display = 'block';
             }, 1000);
 
             // Refresh the drive to reflect changes
