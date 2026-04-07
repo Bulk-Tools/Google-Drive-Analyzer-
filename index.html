@@ -140,10 +140,15 @@
                     <span id="move-progress-percentage">0%</span>
                 </div>
             </div>
-            <div style="margin-top: 10px;">
+            <div style="margin-top: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                 <button id="move-stop-button" onclick="stopMoveProcess()" style="background: #d93025;">
                     <span class="material-icons">stop</span> Stop Process
                 </button>
+                <div id="move-live-stats" style="display: flex; gap: 15px; font-size: 13px; font-weight: 500;">
+                    <span style="color: #34a853;">✓ Moved: <span id="move-success-count">0</span></span>
+                    <span style="color: #f9ab00;">⚠️ Skipped: <span id="move-skipped-count">0</span></span>
+                    <span style="color: #d93025;">✗ Failed: <span id="move-failed-count">0</span></span>
+                </div>
             </div>
             <div class="processed-files" id="move-processed-files">
                 <div class="processed-files-title">Processed Items:</div>
@@ -1259,6 +1264,11 @@
             stopButton.disabled = false;
             stopButton.innerHTML = '<span class="material-icons">stop</span> Stop Process';
 
+            // Reset live stats counters
+            document.getElementById('move-success-count').textContent = '0';
+            document.getElementById('move-skipped-count').textContent = '0';
+            document.getElementById('move-failed-count').textContent = '0';
+
             let successful = 0, failed = 0, skipped = 0;
             const errors = [];
 
@@ -1337,11 +1347,14 @@
 
                 if (result.status === 'success') {
                     successful++;
+                    document.getElementById('move-success-count').textContent = successful;
                 } else if (result.status === 'error') {
                     failed++;
+                    document.getElementById('move-failed-count').textContent = failed;
                     errors.push(`${result.file.name}: ${result.error}`);
                 } else if (result.status === 'skipped') {
                     skipped++;
+                    document.getElementById('move-skipped-count').textContent = skipped;
                 }
 
                 // Note: The processing item is already in the list and updated by moveFile()
