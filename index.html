@@ -1268,17 +1268,32 @@
                     return { status: 'stopped', file };
                 }
 
+                // Show "processing" status immediately
+                const processingItem = document.createElement('div');
+                processingItem.className = 'processed-file-item';
+                processingItem.style.color = '#1a73e8';
+                processingItem.textContent = `⏳ Processing: "${file.name}"...`;
+                processingItem.setAttribute('data-file-id', file.id);
+                processedFilesList.appendChild(processingItem);
+                document.getElementById('move-processed-files').scrollTop = document.getElementById('move-processed-files').scrollHeight;
+
                 // Skip if already in destination
                 const isAtRoot = !file.parents || file.parents.length === 0;
                 if (selectedDestFolderId === 'root' && isAtRoot) {
+                    processingItem.className = 'processed-file-item skipped';
+                    processingItem.textContent = `⚠️ Skipped: "${file.name}" (already in destination)`;
                     return { status: 'skipped', file, message: `⚠️ Skipped: "${file.name}" (already in destination)` };
                 }
                 if (file.parents && file.parents.includes(selectedDestFolderId)) {
+                    processingItem.className = 'processed-file-item skipped';
+                    processingItem.textContent = `⚠️ Skipped: "${file.name}" (already in destination)`;
                     return { status: 'skipped', file, message: `⚠️ Skipped: "${file.name}" (already in destination)` };
                 }
 
                 // Don't allow moving a folder into itself
                 if (file.id === selectedDestFolderId) {
+                    processingItem.className = 'processed-file-item skipped';
+                    processingItem.textContent = `⚠️ Skipped: "${file.name}" (cannot move folder into itself)`;
                     return { status: 'skipped', file, message: `⚠️ Skipped: "${file.name}" (cannot move folder into itself)` };
                 }
 
@@ -1293,9 +1308,17 @@
                         updateParams.removeParents = previousParents;
                     }
                     await gapi.client.drive.files.update(updateParams);
+
+                    // Update to success
+                    processingItem.className = 'processed-file-item success';
+                    processingItem.textContent = `✓ Moved: "${file.name}" → ${selectedDestFolderName}`;
                     return { status: 'success', file, message: `✓ Moved: "${file.name}" → ${selectedDestFolderName}` };
                 } catch (err) {
                     const errorMsg = err.result?.error?.message || err.message || JSON.stringify(err);
+
+                    // Update to error
+                    processingItem.className = 'processed-file-item error';
+                    processingItem.textContent = `✗ Failed: "${file.name}" - ${errorMsg}`;
                     return { status: 'error', file, error: errorMsg, message: `✗ Failed: "${file.name}" - ${errorMsg}` };
                 }
             }
@@ -1317,14 +1340,8 @@
                     skipped++;
                 }
 
-                // Add to processed files list
-                const fileItem = document.createElement('div');
-                fileItem.className = `processed-file-item ${result.status}`;
-                fileItem.textContent = result.message;
-                processedFilesList.appendChild(fileItem);
-
-                // Auto-scroll to bottom to show latest processed item
-                document.getElementById('move-processed-files').scrollTop = document.getElementById('move-processed-files').scrollHeight;
+                // Note: The processing item is already in the list and updated by moveFile()
+                // We don't need to add it again here
             }
 
             // Process files in batches for maximum speed
