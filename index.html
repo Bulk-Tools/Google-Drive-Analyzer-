@@ -285,14 +285,18 @@
             let files = [], pageToken = null;
             try {
                 do {
-                    const res = await gapi.client.drive.files.list({ pageSize: 1000, fields: 'nextPageToken, files(id, name, mimeType, parents, size)', pageToken: pageToken || '' });
+                    const res = await gapi.client.drive.files.list({ pageSize: 1000, fields: 'nextPageToken, files(id, name, mimeType, parents, size, ownedByMe)', pageToken: pageToken || '' });
                     files = files.concat(res.result.files || []);
                     pageToken = res.result.nextPageToken;
                 } while (pageToken);
 
-                allFiles = files; // Store for move feature
-                status.innerHTML = `<span class="material-icons">check_circle</span> Mapped ${files.length} items.`;
-                treeData = buildTree(files);
+                // Filter out files not owned by the user (shared folder files)
+                const ownedFiles = files.filter(file => file.ownedByMe !== false);
+                const excludedCount = files.length - ownedFiles.length;
+
+                allFiles = ownedFiles; // Store only owned files for move feature
+                status.innerHTML = `<span class="material-icons">check_circle</span> Mapped ${ownedFiles.length} items${excludedCount > 0 ? ` (excluded ${excludedCount} shared folder items)` : ''}.`;
+                treeData = buildTree(ownedFiles);
                 renderTree(treeData, document.getElementById('tree-container'));
                 document.getElementById('tools').style.display = 'block';
             } catch (err) { status.innerText = `Error: ${err.message}`; }
